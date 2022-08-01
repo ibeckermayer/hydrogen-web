@@ -18,7 +18,7 @@ import {BaseObservable} from "../BaseObservable";
 import {JoinedMap} from "./index";
 import {MappedMap} from "./index";
 import {FilteredMap} from "./index";
-import {SortedMapList} from "../list/SortedMapList.js";
+import {SortedMapList} from "../list/SortedMapList";
 
 
 export interface IMapObserver<K, V> {
@@ -72,9 +72,9 @@ export abstract class BaseObservableMap<K, V> extends BaseObservable<IMapObserve
          return new MappedMap(this, mapper, updater);
      }
 
-     sortValues(comparator: Comparator<V>): SortedMapList {
-         return new SortedMapList(this, comparator);
-     }
+    sortValues(comparator: Comparator<V>): SortedMapList<K, V> {
+        return new SortedMapList(this, comparator);
+    }
 
      filterValues(filter: Filter<K, V>): FilteredMap<K, V> {
          return new FilteredMap(this, filter);
