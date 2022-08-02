@@ -16,7 +16,6 @@ limitations under the License.
 
 import {BaseObservableMap} from "./BaseObservableMap";
 import {SubscriptionHandle} from "../BaseObservable";
-import {BaseObservableMapTransformers} from "./BaseObservableMapTransformers";
 
 
 export class ApplyMap<K, V> extends BaseObservableMap<K, V> {
@@ -26,7 +25,7 @@ export class ApplyMap<K, V> extends BaseObservableMap<K, V> {
 
 
     constructor(source: BaseObservableMap<K, V>, apply?: Apply<K, V>) {
-        super(new BaseObservableMapTransformers<K, V>());
+        super();
         this._source = source;
         this._apply = apply;
     }

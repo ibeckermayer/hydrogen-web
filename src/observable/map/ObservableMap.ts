@@ -15,14 +15,13 @@ limitations under the License.
 */
 
 import {BaseObservableMap} from "./BaseObservableMap";
-import {BaseObservableMapTransformers} from "./BaseObservableMapTransformers";
 
 
-export class ObservableMap<K, V> extends BaseObservableMap<K, V> {
+export class _ObservableMap<K, V> extends BaseObservableMap<K, V> {
     private readonly _values: Map<K, V>;
 
     constructor(initialValues?: (readonly [K, V])[]) {
-        super(new BaseObservableMapTransformers<K, V>());
+        super();
         this._values = new Map(initialValues);
     }
 
@@ -99,7 +98,7 @@ export class ObservableMap<K, V> extends BaseObservableMap<K, V> {
 export function tests() {
     return {
         test_initial_values(assert): void {
-            const map = new ObservableMap([
+            const map = new _ObservableMap([
                 ["a", 5],
                 ["b", 10]
             ]);
@@ -110,7 +109,7 @@ export function tests() {
 
         test_add(assert): void {
             let fired = 0;
-            const map = new ObservableMap<number, {value: number}>();
+            const map = new _ObservableMap<number, {value: number}>();
             map.subscribe({
                 onAdd(key, value) {
                     fired += 1;
@@ -128,7 +127,7 @@ export function tests() {
 
         test_update(assert): void {
             let fired = 0;
-            const map = new ObservableMap<number, {number: number}>();
+            const map = new _ObservableMap<number, {number: number}>();
             const value = {number: 5};
             map.add(1, value);
             map.subscribe({
@@ -149,7 +148,7 @@ export function tests() {
 
         test_update_unknown(assert): void {
             let fired = 0;
-            const map = new ObservableMap<number, {number: number}>();
+            const map = new _ObservableMap<number, {number: number}>();
             map.subscribe({
                 onUpdate() { fired += 1; },
                 onAdd() {},
@@ -163,7 +162,7 @@ export function tests() {
 
         test_set(assert): void {
             let add_fired = 0, update_fired = 0;
-            const map = new ObservableMap<number, {value: number}>();
+            const map = new _ObservableMap<number, {value: number}>();
             map.subscribe({
                 onAdd(key, value) {
                     add_fired += 1;
@@ -190,7 +189,7 @@ export function tests() {
 
         test_remove(assert): void {
             let fired = 0;
-            const map = new ObservableMap<number, {value: number}>();
+            const map = new _ObservableMap<number, {value: number}>();
             const value = {value: 5};
             map.add(1, value);
             map.subscribe({
@@ -210,7 +209,7 @@ export function tests() {
 
         test_iterate(assert): void {
             const results: any[] = [];
-            const map = new ObservableMap<number, {number: number}>();
+            const map = new _ObservableMap<number, {number: number}>();
             map.add(1, {number: 5});
             map.add(2, {number: 6});
             map.add(3, {number: 7});
@@ -223,7 +222,7 @@ export function tests() {
             assert.equal(results.find(([key]) => key === 3)[1].number, 7);
         },
         test_size(assert): void {
-            const map = new ObservableMap<number, {number: number}>();
+            const map = new _ObservableMap<number, {number: number}>();
             map.add(1, {number: 5});
             map.add(2, {number: 6});
             assert.equal(map.size, 2);

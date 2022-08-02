@@ -45,7 +45,7 @@ with a node containing {value, leftCount, rightCount, leftNode, rightNode, paren
 // types modified outside of the collection (and affecting sort order) or not
 
 // no duplicates allowed for now
-export class SortedMapList extends BaseObservableList {
+export class _SortedMapList extends BaseObservableList {
     constructor(sourceMap, comparator) {
         super();
         this._sourceMap = sourceMap;
@@ -170,7 +170,7 @@ export function tests() {
                 ["b", 6],
                 ["c", -5],
             ]);
-            const list = new SortedMapList(map, (a, b) => a - b);
+            const list = new _SortedMapList(map, (a, b) => a - b);
             list.subscribe({}); //needed to populate iterator
             assert.deepEqual(Array.from(list), [-5, 6, 50]);
             assert.equal(list.length, 3);
@@ -178,7 +178,7 @@ export function tests() {
 
         test_add(assert) {
             const map = new ObservableMap([["a", 50], ["b", 6], ["c", -5]]);
-            const list = new SortedMapList(map, (a, b) => a - b);
+            const list = new _SortedMapList(map, (a, b) => a - b);
             let fired = 0;
             list.subscribe({
                 onAdd(idx, value) {
@@ -194,7 +194,7 @@ export function tests() {
 
         test_remove(assert) {
             const map = new ObservableMap([["a", 50], ["b", 6], ["c", -5]]);
-            const list = new SortedMapList(map, (a, b) => a - b);
+            const list = new _SortedMapList(map, (a, b) => a - b);
             let fired = 0;
             list.subscribe({
                 onRemove(idx, value) {
@@ -215,7 +215,7 @@ export function tests() {
                 ["b", {number: 11}],
                 ["c", {number: 1}],
             ]);
-            const list = new SortedMapList(map, (a, b) => a.number - b.number);
+            const list = new _SortedMapList(map, (a, b) => a.number - b.number);
             let updateFired = 0, moveFired = 0;
             list.subscribe({
                 onUpdate(idx, value, param) {
@@ -245,7 +245,7 @@ export function tests() {
                 ["b", {number: 11}],
                 ["c", {number: 1}],
             ]);
-            const list = new SortedMapList(map, (a, b) => a.number - b.number);
+            const list = new _SortedMapList(map, (a, b) => a.number - b.number);
             let updateFired = 0, moveFired = 0;
             list.subscribe({
                 onUpdate(idx, value, param) {

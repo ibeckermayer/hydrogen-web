@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {BaseObservableMap} from "./BaseObservableMap";
-import {SubscriptionHandle} from "../BaseObservable";
-import {BaseObservableMapTransformers, Filter} from "./BaseObservableMapTransformers";
+import { BaseObservableMap } from "./BaseObservableMap";
+import { SubscriptionHandle } from "../BaseObservable";
 
+export type Filter<K, V> = (v: V, k: K) => boolean;
 
-export class FilteredMap<K, V> extends BaseObservableMap<K, V> {
+export class _FilteredMap<K, V> extends BaseObservableMap<K, V> {
     private _source: BaseObservableMap<K, V>;
     private _filter: Filter<K, V>;
     private _included?: Map<K, boolean>;
     private _subscription?: SubscriptionHandle;
 
     constructor(source: BaseObservableMap<K, V>, filter: Filter<K, V>) {
-        super(new BaseObservableMapTransformers<K, V>());
+        super();
         this._source = source;
         this._filter = filter;
     }
@@ -49,11 +49,14 @@ export class FilteredMap<K, V> extends BaseObservableMap<K, V> {
                 const isIncluded = this._filter(value, key);
                 this._included.set(key, isIncluded);
                 if (!silent) {
-                    const wasIncluded = oldIncluded ? oldIncluded.get(key) : true;
+                    const wasIncluded = oldIncluded
+                        ? oldIncluded.get(key)
+                        : true;
                     this._emitForUpdate(wasIncluded, isIncluded, key, value);
                 }
             }
-        } else { // no filter
+        } else {
+            // no filter
             // did we have a filter before?
             if (this._included && !silent) {
                 // add any non-included items again
@@ -76,7 +79,9 @@ export class FilteredMap<K, V> extends BaseObservableMap<K, V> {
                     return;
                 }
             } else {
-                throw new Error("Internal logic error: FilteredMap._included used before initialized");
+                throw new Error(
+                    "Internal logic error: FilteredMap._included used before initialized"
+                );
             }
         }
         this.emitAdd(key, value);
@@ -90,7 +95,9 @@ export class FilteredMap<K, V> extends BaseObservableMap<K, V> {
                 this.emitRemove(key, value);
             }
         } else {
-            throw new Error("Internal logic error: FilteredMap._included used before initialized");
+            throw new Error(
+                "Internal logic error: FilteredMap._included used before initialized"
+            );
         }
     }
 
@@ -109,7 +116,13 @@ export class FilteredMap<K, V> extends BaseObservableMap<K, V> {
         }
     }
 
-    _emitForUpdate(wasIncluded: boolean | undefined, isIncluded: boolean, key: K, value: V, params: any = null): void {
+    _emitForUpdate(
+        wasIncluded: boolean | undefined,
+        isIncluded: boolean,
+        key: K,
+        value: V,
+        params: any = null
+    ): void {
         if (wasIncluded && !isIncluded) {
             this.emitRemove(key, value);
         } else if (!wasIncluded && isIncluded) {
@@ -145,7 +158,7 @@ export class FilteredMap<K, V> extends BaseObservableMap<K, V> {
 
     get size(): number {
         let count = 0;
-        this._included?.forEach(included => {
+        this._included?.forEach((included) => {
             if (included) {
                 count += 1;
             }
@@ -153,7 +166,7 @@ export class FilteredMap<K, V> extends BaseObservableMap<K, V> {
         return count;
     }
 
-    get(key): V | undefined{
+    get(key): V | undefined {
         const value = this._source.get(key);
         if (value && this._filter(value, key)) {
             return value;
@@ -162,8 +175,8 @@ export class FilteredMap<K, V> extends BaseObservableMap<K, V> {
 }
 
 class FilterIterator<K, V> {
-    private _included?: Map<K, boolean>
-    private _sourceIterator: Iterator<[K, V], any, undefined>
+    private _included?: Map<K, boolean>;
+    private _sourceIterator: Iterator<[K, V], any, undefined>;
     constructor(map: BaseObservableMap<K, V>, included?: Map<K, boolean>) {
         this._included = included;
         this._sourceIterator = map[Symbol.iterator]();
@@ -195,7 +208,10 @@ export function tests() {
             source.add("one", 1);
             source.add("two", 2);
             source.add("three", 3);
-            const oddNumbers = new FilteredMap(source, (x: number) => x % 2 !== 0);
+            const oddNumbers = new _FilteredMap(
+                source,
+                (x: number) => x % 2 !== 0
+            );
             // can only iterate after subscribing
             oddNumbers.subscribe({
                 onAdd() {
@@ -229,11 +245,13 @@ export function tests() {
 
         "emits must trigger once": (assert): void => {
             const source = new ObservableMap();
-            let count_add = 0, count_update = 0, count_remove = 0;
+            let count_add = 0,
+                count_update = 0,
+                count_remove = 0;
             source.add("num1", 1);
             source.add("num2", 2);
             source.add("num3", 3);
-            const oddMap = new FilteredMap(source, (x: number) => x % 2 !== 0);
+            const oddMap = new _FilteredMap(source, (x: number) => x % 2 !== 0);
             oddMap.subscribe({
                 onAdd() {
                     count_add += 1;
@@ -246,7 +264,7 @@ export function tests() {
                 },
                 onReset() {
                     return;
-                }
+                },
             });
             source.set("num3", 4);
             source.set("num3", 5);
@@ -254,6 +272,6 @@ export function tests() {
             assert.strictEqual(count_add, 1);
             assert.strictEqual(count_update, 1);
             assert.strictEqual(count_remove, 1);
-        }
+        },
     };
 }

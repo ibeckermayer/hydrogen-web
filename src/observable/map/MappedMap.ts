@@ -14,29 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {BaseObservableMap} from "./BaseObservableMap";
-import {BaseObservableMapTransformers, Mapper, Updater} from "./BaseObservableMapTransformers";
-import {SubscriptionHandle} from "../BaseObservable";
+import { BaseObservableMap } from "./BaseObservableMap";
+import { SubscriptionHandle } from "../BaseObservable";
 
+export type Mapper<V> = (value: V, emitSpontaneousUpdate: any) => V;
+export type Updater<V> = (params: any, mappedValue?: V, value?: V) => void;
 
 /*
 so a mapped value can emit updates on it's own with this._emitSpontaneousUpdate that is passed in the mapping function
 how should the mapped value be notified of an update though? and can it then decide to not propagate the update?
 */
-export class MappedMap<K, V> extends BaseObservableMap<K, V> {
+export class _MappedMap<K, V> extends BaseObservableMap<K, V> {
     private _source: BaseObservableMap<K, V>;
     private _mapper: Mapper<V>;
     private _updater?: Updater<V>;
     private _mappedValues: Map<K, V>;
     private _subscription?: SubscriptionHandle;
 
-
     constructor(
         source: BaseObservableMap<K, V>,
         mapper: Mapper<V>,
         updater?: Updater<V>
     ) {
-        super(new BaseObservableMapTransformers<K, V>());
+        super();
         this._source = source;
         this._mapper = mapper;
         this._updater = updater;
@@ -51,13 +51,16 @@ export class MappedMap<K, V> extends BaseObservableMap<K, V> {
     }
 
     onAdd(key: K, value: V): void {
-        const emitSpontaneousUpdate = this._emitSpontaneousUpdate.bind(this, key);
+        const emitSpontaneousUpdate = this._emitSpontaneousUpdate.bind(
+            this,
+            key
+        );
         const mappedValue = this._mapper(value, emitSpontaneousUpdate);
         this._mappedValues.set(key, mappedValue);
         this.emitAdd(key, mappedValue);
     }
 
-    onRemove(key: K/*, _value*/): void {
+    onRemove(key: K /*, _value*/): void {
         const mappedValue = this._mappedValues.get(key);
         if (this._mappedValues.delete(key)) {
             if (mappedValue) this.emitRemove(key, mappedValue);
@@ -80,7 +83,10 @@ export class MappedMap<K, V> extends BaseObservableMap<K, V> {
     onSubscribeFirst(): void {
         this._subscription = this._source.subscribe(this);
         for (let [key, value] of this._source) {
-            const emitSpontaneousUpdate = this._emitSpontaneousUpdate.bind(this, key);
+            const emitSpontaneousUpdate = this._emitSpontaneousUpdate.bind(
+                this,
+                key
+            );
             const mappedValue = this._mapper(value, emitSpontaneousUpdate);
             this._mappedValues.set(key, mappedValue);
         }
