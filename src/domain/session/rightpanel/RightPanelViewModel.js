@@ -16,7 +16,7 @@ limitations under the License.
 
 import {ViewModel} from "../../ViewModel";
 import {RoomDetailsViewModel} from "./RoomDetailsViewModel.js";
-import {MemberListViewModel} from "./MemberListViewModel.js";
+import {MemberListViewModel} from "./MemberListViewModel";
 import {MemberDetailsViewModel} from "./MemberDetailsViewModel";
 
 export class RightPanelViewModel extends ViewModel {

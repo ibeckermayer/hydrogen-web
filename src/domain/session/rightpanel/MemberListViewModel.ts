@@ -16,13 +16,13 @@ limitations under the License.
 
 import {ViewModel} from "../../ViewModel";
 import type {Options as BaseOptions} from "../../ViewModel";
-import {MemberTileViewModel} from "./MemberTileViewModel.js";
+import {MemberTileViewModel} from "./MemberTileViewModel";
 import {createMemberComparator} from "./members/comparator.js";
 import {Disambiguator} from "./members/disambiguator.js";
 import type {RetainedObservableValue} from "../../../observable/ObservableValue";
 import type {PowerLevels} from "../../../matrix/room/PowerLevels.js";
 import type {MemberList} from "../../../matrix/room/members/MemberList.js";
-import type { MediaRepository } from "../../../matrix/net/MediaRepository";
+import type {MediaRepository} from "../../../matrix/net/MediaRepository";
 import type {MappedMap} from "../../../observable/map/MappedMap";
 import type {ObservableMap, Mapper, Updater} from "../../../observable/map";
 import type {RoomMember} from "../../../matrix/room/members/RoomMember.js";
