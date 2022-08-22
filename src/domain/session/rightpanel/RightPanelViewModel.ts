@@ -17,7 +17,7 @@ limitations under the License.
 import {ViewModel} from "../../ViewModel";
 import type {Options as BaseOptions} from "../../ViewModel";
 import type {SegmentType, Path} from "../../navigation";
-import {RoomDetailsViewModel} from "./RoomDetailsViewModel.js";
+import {RoomDetailsViewModel} from "./RoomDetailsViewModel";
 import {MemberListViewModel} from "./MemberListViewModel";
 import {MemberDetailsViewModel} from "./MemberDetailsViewModel";
 import type {Room} from "../../../matrix/room/Room";
@@ -47,7 +47,7 @@ export class RightPanelViewModel extends ViewModel {
         this._setupNavigation();
     }
 
-    get activeViewModel(): ActiveViewModel { return this._activeViewModel; }
+    get activeViewModel(): ActiveViewModel | undefined { return this._activeViewModel; }
 
     async _getMemberListArguments(): Promise<
         {
@@ -106,7 +106,7 @@ export class RightPanelViewModel extends ViewModel {
 
     _hookUpdaterToSegment(
         segment: keyof SegmentType,
-        viewmodel: ActiveViewModel,
+        viewmodel: TypeOfActiveViewModel,
         argCreator: () => Promise<boolean | object>,
         failCallback: VoidFunction = (): void => {}
     ): void {
@@ -122,7 +122,7 @@ export class RightPanelViewModel extends ViewModel {
 
     _setupUpdater(
         segment: keyof SegmentType,
-        viewmodel: ActiveViewModel,
+        viewmodel: TypeOfActiveViewModel,
         argCreator: () => Promise<boolean | object>,
         failCallback: VoidFunction = (): void => {}
     ): Updater {
@@ -155,17 +155,18 @@ export class RightPanelViewModel extends ViewModel {
     }
 
     showPreviousPanel(): void {
-        const segmentName = this.activeViewModel.previousSegmentName;
+        const segmentName = this.activeViewModel!.previousSegmentName;
         if (segmentName) {
             let path: Path<SegmentType> | undefined = this.navigation.path.until("room");
             path = path!.with(this.navigation.segment("right-panel", true));
-            path = path!.with(this.navigation.segment(segmentName, true));
+            path = path!.with(this.navigation.segment(segmentName as keyof SegmentType, true));
             this.navigation.applyPath(path!);
         }
     }
 }
 
 type ActiveViewModel = RoomDetailsViewModel | MemberListViewModel | MemberDetailsViewModel;
+type TypeOfActiveViewModel = typeof RoomDetailsViewModel | typeof MemberListViewModel | typeof MemberDetailsViewModel;
 type Updater = (skipDispose?: boolean) => Promise<void>;
 type PowerLevelsObservable = RetainedObservableValue<PowerLevels>;
 type ObservableMember = RetainedObservableValue<RoomMember>;
