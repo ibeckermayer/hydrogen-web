@@ -18,15 +18,15 @@ import {ViewModel} from "../../ViewModel";
 import type {Options as BaseOptions} from "../../ViewModel";
 import type {SegmentType, Path} from "../../navigation";
 import {RoomDetailsViewModel} from "./RoomDetailsViewModel";
+import type {ExplicitOptions as RoomDetailsViewModelOptions} from "./RoomDetailsViewModel";
 import {MemberListViewModel} from "./MemberListViewModel";
+import type {ExplicitOptions as MemberListViewModelOptions} from "./MemberListViewModel";
 import {MemberDetailsViewModel} from "./MemberDetailsViewModel";
+import type {ExplicitOptions as MemberDetailsViewModelOptions} from "./MemberDetailsViewModel";
 import type {Room} from "../../../matrix/room/Room";
 import type {Session} from "../../../matrix/Session";
 import type {MemberList} from "../../../matrix/room/members/MemberList";
-import type {MediaRepository} from "../../../matrix/net/MediaRepository";
-import type {RoomMember} from "../../../matrix/room/members/RoomMember";
-import type {PowerLevels} from "../../../matrix/room/PowerLevels.js";
-import type {RetainedObservableValue} from "../../../lib";
+
 
 type Options = {
     room: Room,
@@ -49,13 +49,7 @@ export class RightPanelViewModel extends ViewModel {
 
     get activeViewModel(): ActiveViewModel | undefined { return this._activeViewModel; }
 
-    async _getMemberListArguments(): Promise<
-        {
-            members: MemberList,
-            powerLevelsObservable: PowerLevelsObservable,
-            mediaRepository: MediaRepository
-        }
-    > {
+    async _getMemberListArguments(): Promise<MemberListViewModelOptions> {
         if (!this._members) {
             this._members = await this._room.loadMemberList();
             this.track(() => this._members.release());
@@ -66,15 +60,7 @@ export class RightPanelViewModel extends ViewModel {
     }
 
 
-    async _getMemberDetailsArguments(): Promise<false |
-        {
-            observableMember: ObservableMember;
-            isEncrypted: boolean;
-            powerLevelsObservable: PowerLevelsObservable;
-            mediaRepository: MediaRepository;
-            session: Session;
-        }
-    > {
+    async _getMemberDetailsArguments(): Promise<false | MemberDetailsViewModelOptions> {
         const segment = this.navigation.path.get("member");
         const userId = segment!.value;
         const observableMember = await this._room.observeMember(userId);
@@ -107,7 +93,7 @@ export class RightPanelViewModel extends ViewModel {
     _hookUpdaterToSegment(
         segment: keyof SegmentType,
         viewmodel: TypeOfActiveViewModel,
-        argCreator: () => Promise<boolean | object>,
+        argCreator: () => Promise<false | ActiveViewModelOptions>,
         failCallback: VoidFunction = (): void => {}
     ): void {
         const observable = this.navigation.observe(segment);
@@ -123,7 +109,7 @@ export class RightPanelViewModel extends ViewModel {
     _setupUpdater(
         segment: keyof SegmentType,
         viewmodel: TypeOfActiveViewModel,
-        argCreator: () => Promise<boolean | object>,
+        argCreator: () => Promise<false | ActiveViewModelOptions>,
         failCallback: VoidFunction = (): void => {}
     ): Updater {
         const updater = async (skipDispose = false): Promise<void> => {
@@ -140,7 +126,10 @@ export class RightPanelViewModel extends ViewModel {
                     return;
                 }
                 this._activeViewModel = this.track(
-                    new viewmodel(this.childOptions(args))
+                    // `as any` below silences the type checker;
+                    // we're assuming that we've passed the right args
+                    // to the right viewmodel here
+                    new viewmodel(this.childOptions(args) as any)
                 );
             }
             this.emitChange("activeViewModel");
@@ -167,6 +156,5 @@ export class RightPanelViewModel extends ViewModel {
 
 type ActiveViewModel = RoomDetailsViewModel | MemberListViewModel | MemberDetailsViewModel;
 type TypeOfActiveViewModel = typeof RoomDetailsViewModel | typeof MemberListViewModel | typeof MemberDetailsViewModel;
+type ActiveViewModelOptions = RoomDetailsViewModelOptions | MemberListViewModelOptions | MemberDetailsViewModelOptions;
 type Updater = (skipDispose?: boolean) => Promise<void>;
-type PowerLevelsObservable = RetainedObservableValue<PowerLevels>;
-type ObservableMember = RetainedObservableValue<RoomMember>;

@@ -27,12 +27,13 @@ import type {MappedMap} from "../../../observable/map/MappedMap";
 import type {ObservableMap, Mapper, Updater} from "../../../observable/map";
 import type {RoomMember} from "../../../matrix/room/members/RoomMember.js";
 
-
-type Options = BaseOptions & {
+export type ExplicitOptions = {
     members: MemberList,
     powerLevelsObservable: RetainedObservableValue<PowerLevels>,
     mediaRepository: MediaRepository
-}
+};
+
+type Options = BaseOptions & ExplicitOptions;
 
 export class MemberListViewModel extends ViewModel {
     memberTileViewModels: MappedMap<string, RoomMember, MemberTileViewModel>;

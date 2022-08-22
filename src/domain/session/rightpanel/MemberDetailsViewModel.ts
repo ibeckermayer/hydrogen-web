@@ -24,13 +24,15 @@ import type {Session} from "../../../matrix/Session";
 import type {RoomMember} from "../../../matrix/room/members/RoomMember.js";
 import type {PowerLevels} from "../../../matrix/room/PowerLevels.js";
 
-type Options = BaseOptions & {
+export type ExplicitOptions = {
     observableMember: RetainedObservableValue<RoomMember>,
     mediaRepository: MediaRepository,
     isEncrypted: boolean,
     powerLevelsObservable: RetainedObservableValue<PowerLevels>,
     session: Session
-}
+};
+
+type Options = BaseOptions & ExplicitOptions;
 
 export class MemberDetailsViewModel extends ViewModel {
     private _observableMember: RetainedObservableValue<RoomMember>;
