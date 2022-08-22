@@ -117,7 +117,7 @@ export class RightPanelViewModel extends ViewModel {
             argCreator,
             failCallback
         );
-        this.track(observable.subscribe(updater as (b: boolean) => void));
+        this.track(observable.subscribe(updater));
     }
 
     _setupUpdater(
