@@ -27,7 +27,7 @@ import {SettingsViewModel} from "./settings/SettingsViewModel.js";
 import {CreateRoomViewModel} from "./CreateRoomViewModel.js";
 import {ViewModel} from "../ViewModel";
 import {RoomViewModelObservable} from "./RoomViewModelObservable.js";
-import {RightPanelViewModel} from "./rightpanel/RightPanelViewModel.js";
+import {RightPanelViewModel} from "./rightpanel/RightPanelViewModel";
 
 export class SessionViewModel extends ViewModel {
     constructor(options) {
