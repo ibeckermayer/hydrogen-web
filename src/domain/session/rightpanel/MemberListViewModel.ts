@@ -17,7 +17,7 @@ limitations under the License.
 import {ViewModel} from "../../ViewModel";
 import type {Options as BaseOptions} from "../../ViewModel";
 import {MemberTileViewModel} from "./MemberTileViewModel";
-import {createMemberComparator} from "./members/comparator.js";
+import {createMemberComparator} from "./members/comparator";
 import {Disambiguator} from "./members/disambiguator";
 import type {RetainedObservableValue} from "../../../observable/ObservableValue";
 import type {PowerLevels} from "../../../matrix/room/PowerLevels.js";
