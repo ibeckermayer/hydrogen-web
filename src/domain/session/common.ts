@@ -14,7 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export function imageToInfo(image) {
+type Image = {
+    width: number;
+    height: number;
+    blob: {
+        mimeType: string,
+        size: number
+    }
+}
+
+export type MultiMediaInfo = {
+    w: number;
+    h: number;
+    mimetype: string,
+    size: number,
+    thumbnail_info?: MultiMediaInfo,
+    duration?: number
+}
+
+export function imageToInfo(image: Image): MultiMediaInfo {
     return {
         w: image.width,
         h: image.height,
