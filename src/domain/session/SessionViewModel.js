@@ -18,8 +18,8 @@ limitations under the License.
 import {LeftPanelViewModel} from "./leftpanel/LeftPanelViewModel.js";
 import {RoomViewModel} from "./room/RoomViewModel";
 import {UnknownRoomViewModel} from "./room/UnknownRoomViewModel";
-import {InviteViewModel} from "./room/InviteViewModel.js";
-import {RoomBeingCreatedViewModel} from "./room/RoomBeingCreatedViewModel.js";
+import {InviteViewModel} from "./room/InviteViewModel";
+import {RoomBeingCreatedViewModel} from "./room/RoomBeingCreatedViewModel";
 import {LightboxViewModel} from "./room/LightboxViewModel.js";
 import {SessionStatusViewModel} from "./SessionStatusViewModel.js";
 import {RoomGridViewModel} from "./RoomGridViewModel.js";
