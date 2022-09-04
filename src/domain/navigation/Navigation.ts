@@ -82,6 +82,7 @@ export class Navigation<T extends object> {
         this._pathObservable.set(this._path);
     }
 
+
     observe(type: keyof T): SegmentObservable<T> {
         let observable = this._observables.get(type);
         if (!observable) {
@@ -203,7 +204,7 @@ class SegmentObservable<T extends object> extends BaseObservableValue<T[keyof T]
     private readonly _navigation: Navigation<T>;
     private _type: keyof T;
     private _lastSetValue?: T[keyof T];
-        
+
     constructor(navigation: Navigation<T>, type: keyof T) {
         super();
         this._navigation = navigation;
