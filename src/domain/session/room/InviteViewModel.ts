@@ -123,7 +123,7 @@ export class InviteViewModel extends ViewModel implements IGridItemViewModel {
     }
 
     _onInviteChange(): void {
-        this.emitChange("TODO");
+        this.emitChange("invite");
     }
 
     dispose(): void {

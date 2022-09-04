@@ -71,7 +71,7 @@ export class RoomBeingCreatedViewModel extends ViewModel implements IGridItemVie
     focus(): void {}
 
     _onRoomChange(): void {
-        this.emitChange("TODO");
+        this.emitChange("roomBeingCreated");
     }
 
     cancel(): void {
