@@ -35,13 +35,13 @@ import type {Options as ViewModelOptions} from "../../ViewModel";
 
 
 type Options = {
-    client: Client;
+    client?: Client;
     room: Room,
     tileClassForEntry?: TileClassForEntryFn
 } & ViewModelOptions;
 
 export class RoomViewModel extends ViewModel implements IGridItemViewModel {
-    private _client : Client;
+    private _client: Client;
     private _room: Room;
     private _tileClassForEntry: TileClassForEntryFn;
     private _composerVM?: InternalViewModel;
