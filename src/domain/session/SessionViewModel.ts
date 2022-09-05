@@ -33,7 +33,6 @@ import type {Options as ViewModelOptions} from "../ViewModel";
 import type {Client} from "../../matrix/Client";
 import type {Room} from "../../matrix/room/Room";
 import type {IGridItemViewModel} from "./room/IGridItemViewModel";
-import type {ObservedSegmentTypeType} from "../../domain/navigation";
 
 type Options = {
     client: Client
@@ -66,42 +65,42 @@ export class SessionViewModel extends ViewModel {
     _setupNavigation(): void {
         const gridRooms = this.navigation.observe("rooms");
         // this gives us a set of room ids in the grid
-        this.track(gridRooms.subscribe((roomIds: string[]) => {
+        this.track(gridRooms.subscribe((roomIds: string[] | undefined) => {
             this._updateGrid(roomIds);
         }));
         if (gridRooms.get()) {
-            this._updateGrid(gridRooms.get());
+            this._updateGrid(gridRooms.get() as string[] | undefined);
         }
 
         const currentRoomId = this.navigation.observe("room");
         // this gives us the active room
-        this.track(currentRoomId.subscribe(roomId => {
+        this.track(currentRoomId.subscribe((roomId: string | undefined) => {
             if (!this._gridViewModel) {
                 this._updateRoom(roomId);
             }
             this._updateRightPanel();
         }));
         if (!this._gridViewModel) {
-            this._updateRoom(currentRoomId.get());
+            this._updateRoom(currentRoomId.get() as string | undefined);
         }
 
         const settings = this.navigation.observe("settings");
-        this.track(settings.subscribe(settingsOpen => {
+        this.track(settings.subscribe((settingsOpen: boolean | undefined) => {
             this._updateSettings(settingsOpen);
         }));
-        this._updateSettings(settings.get());
+        this._updateSettings(settings.get() as boolean | undefined);
 
         const createRoom = this.navigation.observe("create-room");
-        this.track(createRoom.subscribe(createRoomOpen => {
+        this.track(createRoom.subscribe((createRoomOpen: boolean | undefined) => {
             this._updateCreateRoom(createRoomOpen);
         }));
-        this._updateCreateRoom(createRoom.get());
+        this._updateCreateRoom(createRoom.get() as boolean | undefined);
 
         const lightbox = this.navigation.observe("lightbox");
-        this.track(lightbox.subscribe(eventId => {
+        this.track(lightbox.subscribe((eventId: string | undefined) => {
             this._updateLightbox(eventId);
         }));
-        this._updateLightbox(lightbox.get());
+        this._updateLightbox(lightbox.get() as string | undefined);
 
 
         const rightpanel = this.navigation.observe("right-panel");
@@ -158,7 +157,7 @@ export class SessionViewModel extends ViewModel {
         return this._createRoomViewModel;
     }
 
-    _updateGrid(roomIds: ObservedSegmentTypeType): void {
+    _updateGrid(roomIds: string[] | undefined): void {
         const changed = !(this._gridViewModel && roomIds);
         const currentRoomId = this.navigation.path.get("room");
         if (roomIds) {
@@ -241,7 +240,7 @@ export class SessionViewModel extends ViewModel {
         }
     }
 
-    _updateRoom(roomId: ObservedSegmentTypeType): void {
+    _updateRoom(roomId: string | undefined): void {
         // opening a room and already open?
         if (this._roomViewModelObservable?.id === roomId) {
             return;
@@ -265,7 +264,7 @@ export class SessionViewModel extends ViewModel {
         void vmo.initialize();
     }
 
-    _updateSettings(settingsOpen: ObservedSegmentTypeType): void {
+    _updateSettings(settingsOpen: boolean | undefined): void {
         if (this._settingsViewModel) {
             this._settingsViewModel = this.disposeTracked(this._settingsViewModel);
         }
@@ -278,7 +277,7 @@ export class SessionViewModel extends ViewModel {
         this.emitChange("activeMiddleViewModel");
     }
 
-    _updateCreateRoom(createRoomOpen: ObservedSegmentTypeType): void {
+    _updateCreateRoom(createRoomOpen: boolean | undefined): void {
         if (this._createRoomViewModel) {
             this._createRoomViewModel = this.disposeTracked(this._createRoomViewModel);
         }
@@ -288,7 +287,7 @@ export class SessionViewModel extends ViewModel {
         this.emitChange("activeMiddleViewModel");
     }
 
-    _updateLightbox(eventId: ObservedSegmentTypeType): void {
+    _updateLightbox(eventId: string | undefined): void {
         if (this._lightboxViewModel) {
             this._lightboxViewModel = this.disposeTracked(this._lightboxViewModel);
         }
