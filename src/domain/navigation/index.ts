@@ -35,8 +35,6 @@ export type SegmentType = {
     "member": string;
 };
 
-export type ObservedSegmentTypeType = SegmentType[keyof SegmentType] | undefined;
-
 export function createNavigation(): Navigation<SegmentType> {
     return new Navigation(allowsChild);
 }
