@@ -212,7 +212,7 @@ class SegmentObservable<T extends object> extends BaseObservableValue<T[keyof T]
         this._lastSetValue = navigation.path.get(type)?.value;
     }
 
-    get(): T[keyof T] | undefined {
+    get<R = T[keyof T]>(): R | undefined {
         const path = this._navigation.path;
         const segment = path.get(this._type);
         const value = segment?.value;

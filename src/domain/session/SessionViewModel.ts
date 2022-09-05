@@ -69,7 +69,7 @@ export class SessionViewModel extends ViewModel {
             this._updateGrid(roomIds);
         }));
         if (gridRooms.get()) {
-            this._updateGrid(gridRooms.get() as string[] | undefined);
+            this._updateGrid(gridRooms.get());
         }
 
         const currentRoomId = this.navigation.observe("room");
@@ -81,26 +81,26 @@ export class SessionViewModel extends ViewModel {
             this._updateRightPanel();
         }));
         if (!this._gridViewModel) {
-            this._updateRoom(currentRoomId.get() as string | undefined);
+            this._updateRoom(currentRoomId.get());
         }
 
         const settings = this.navigation.observe("settings");
         this.track(settings.subscribe((settingsOpen: boolean | undefined) => {
             this._updateSettings(settingsOpen);
         }));
-        this._updateSettings(settings.get() as boolean | undefined);
+        this._updateSettings(settings.get());
 
         const createRoom = this.navigation.observe("create-room");
         this.track(createRoom.subscribe((createRoomOpen: boolean | undefined) => {
             this._updateCreateRoom(createRoomOpen);
         }));
-        this._updateCreateRoom(createRoom.get() as boolean | undefined);
+        this._updateCreateRoom(createRoom.get());
 
         const lightbox = this.navigation.observe("lightbox");
         this.track(lightbox.subscribe((eventId: string | undefined) => {
             this._updateLightbox(eventId);
         }));
-        this._updateLightbox(lightbox.get() as string | undefined);
+        this._updateLightbox(lightbox.get());
 
 
         const rightpanel = this.navigation.observe("right-panel");
