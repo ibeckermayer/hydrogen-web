@@ -28,6 +28,7 @@ import {RoomStatus} from "../../../matrix/room/common";
 
 import type {Room} from "../../../matrix/room/Room";
 import type {TileClassForEntryFn, Options as TileOptions} from "./timeline/tiles";
+import type {SimpleTile} from "./timeline/tiles/SimpleTile";
 import type {Client} from "../../../matrix/Client";
 import type {Timeout} from "../../../platform/web/dom/Clock";
 import type {VideoHandle} from "../../../platform/web/dom/ImageHandle";
@@ -35,13 +36,13 @@ import type {Options as ViewModelOptions} from "../../ViewModel";
 
 
 type Options = {
-    client: Client;
+    client?: Client;
     room: Room,
     tileClassForEntry?: TileClassForEntryFn
 } & ViewModelOptions;
 
 export class RoomViewModel extends ViewModel implements IGridItemViewModel {
-    private _client : Client;
+    private _client: Client;
     private _room: Room;
     private _tileClassForEntry: TileClassForEntryFn;
     private _composerVM?: InternalViewModel;
@@ -149,7 +150,7 @@ export class RoomViewModel extends ViewModel implements IGridItemViewModel {
     // so emit all fields originating from summary
     _onRoomChange(): void {
         // propagate the update to the child view models so it's bindings can update based on room changes
-        this._composerVM.emitChange("TODO");
+        this._composerVM?.emitChange("TODO");
         this.emitChange("TODO");
     }
 
@@ -210,7 +211,7 @@ export class RoomViewModel extends ViewModel implements IGridItemViewModel {
         this._room.join();
     }
 
-    _createTile(entry: TimelineEntry): void {
+    _createTile(entry: TimelineEntry): SimpleTile | undefined {
         if (this._tileOptions) {
             const Tile = this._tileOptions.tileClassForEntry(entry);
             if (Tile) {
@@ -433,7 +434,7 @@ export class RoomViewModel extends ViewModel implements IGridItemViewModel {
         return this._room;
     }
 
-    get composerViewModel(): InternalViewModel {
+    get composerViewModel(): InternalViewModel | undefined {
         return this._composerVM;
     }
 
@@ -446,7 +447,9 @@ export class RoomViewModel extends ViewModel implements IGridItemViewModel {
 
     startReply(entry): void {
         if (!this._room.isArchived) {
-            this._composerVM.setReplyingTo(entry);
+            if (this._composerVM instanceof ComposerViewModel) {
+                this._composerVM?.setReplyingTo(entry);
+            }
         }
     }
 
