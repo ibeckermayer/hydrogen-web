@@ -16,7 +16,7 @@ limitations under the License.
 
 import {EventEmitter} from "../../utils/EventEmitter";
 import {SummaryData, processStateEvent} from "./RoomSummary.js";
-import {Heroes} from "./members/Heroes.js";
+import {Heroes} from "./members/Heroes";
 import {MemberChange, RoomMember, EVENT_TYPE as MEMBER_EVENT_TYPE} from "./members/RoomMember.js";
 
 export class Invite extends EventEmitter {
@@ -189,7 +189,7 @@ export class Invite extends EventEmitter {
             roomId: this.id,
             isEncrypted: !!summaryData.encryption,
             isDirectMessage: summaryData.isDirectMessage,
-//            type: 
+//            type:
             name,
             avatarUrl,
             avatarColorId,
