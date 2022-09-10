@@ -22,7 +22,7 @@ import {Timeline} from "./timeline/Timeline.js";
 import {FragmentIdComparer} from "./timeline/FragmentIdComparer.js";
 import {WrappedError} from "../error.js";
 import {fetchOrLoadMembers, fetchOrLoadMember} from "./members/load";
-import {MemberList} from "./members/MemberList.js";
+import {MemberList} from "./members/MemberList";
 import {Heroes} from "./members/Heroes";
 import {EventEntry} from "./timeline/entries/EventEntry.js";
 import {ObservedEventMap} from "./ObservedEventMap.js";
