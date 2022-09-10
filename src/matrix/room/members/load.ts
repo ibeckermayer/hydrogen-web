@@ -44,7 +44,7 @@ async function fetchMembers(
         setChangedMembersMap,
     }: FetchMembersOptions,
     log: ILogItem
-): Promise<RoomMember[]> {
+): Promise<(RoomMember | undefined)[]> {
     // if any members are changed by sync while we're fetching members,
     // they will end up here, so we check not to override them
     const changedMembersDuringSync = new Map<string, RoomMember>();
@@ -58,7 +58,7 @@ async function fetchMembers(
     ]);
 
     let summaryChanges: SummaryData[];
-    let members: RoomMember[] = [];
+    let members: (RoomMember | undefined)[] = [];
 
     try {
         summaryChanges = summary.writeHasFetchedMembers(true, txn);
@@ -100,7 +100,7 @@ async function fetchMembers(
     return members;
 }
 
-export async function fetchOrLoadMembers(options: FetchOrLoadMembersOptions, logger: ILogger): Promise<RoomMember[]> {
+export async function fetchOrLoadMembers(options: FetchOrLoadMembersOptions, logger: ILogger): Promise<(RoomMember | undefined)[]> {
     const {summary} = options;
     if (!summary.data.hasFetchedMembers) {
         // we only want to log if we fetch members, so start or continue the optional log operation here
@@ -113,7 +113,7 @@ export async function fetchOrLoadMembers(options: FetchOrLoadMembersOptions, log
 export async function fetchOrLoadMember(
     options: FetchOrLoadMemberOptions,
     logger: ILogger
-): Promise<RoomMember | null> {
+): Promise<RoomMember | undefined> {
     const member = await loadMember(options);
     const {summary} = options;
     if (!summary.data.hasFetchedMembers && !member) {
@@ -123,20 +123,20 @@ export async function fetchOrLoadMember(
     return member;
 }
 
-async function loadMember({roomId, userId, storage}: LoadMemberOptions): Promise<RoomMember | null> {
+async function loadMember({roomId, userId, storage}: LoadMemberOptions): Promise<RoomMember | undefined> {
     const txn = await storage.readTxn([storage.storeNames.roomMembers,]);
     const member = await txn.roomMembers.get(roomId, userId);
-    return member? new RoomMember(member) : null;
+    return member? new RoomMember(member) : undefined;
 }
 
-async function fetchMember({roomId, userId, hsApi, storage}: FetchMemberOptions, log: ILogItem): Promise<RoomMember> {
+async function fetchMember({roomId, userId, hsApi, storage}: FetchMemberOptions, log: ILogItem): Promise<(RoomMember | undefined)> {
     let memberData;
     try {
         memberData = await hsApi.state(roomId, "m.room.member", userId, { log }).response();
     }
     catch (error) {
         if (error.name === "HomeServerError" && error.errcode === "M_NOT_FOUND") {
-            return null;
+            return undefined;
         }
         throw error;
     }

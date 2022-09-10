@@ -19,9 +19,10 @@ import type {SummaryData} from "../RoomSummary";
 import type {Transaction} from "../../storage/idb/Transaction";
 import type {MemberChange} from "./RoomMember";
 import type {ILogItem} from "../../../logging/types";
+import { Profile, UserIdProfile } from "../../profile";
 
 export function calculateRoomName(
-    sortedMembers: RoomMember[],
+    sortedMembers: RoomMember[] | Profile[] | UserIdProfile[],
     summaryData: { joinCount: number; inviteCount: number },
     log: ILogItem
 ): string | undefined {
@@ -32,11 +33,11 @@ export function calculateRoomName(
             const firstMembers = sortedMembers.slice(0, sortedMembers.length - 1);
             return firstMembers.map(m => m.name).join(", ") + " and " + lastMember.name;
         } else {
-            const otherMember = sortedMembers[0];
+            const otherMember: RoomMember | Profile | UserIdProfile= sortedMembers[0];
             if (otherMember) {
                 return otherMember.name;
             } else {
-                log.log({l: "could get get other member name", length: sortedMembers.length, otherMember: !!otherMember, otherMemberMembership: otherMember?.membership});
+                log.log({l: "could get get other member name", length: sortedMembers.length, otherMember: !!otherMember});
                 return "Unknown DM Name";
             }
         }
@@ -119,13 +120,12 @@ export class Heroes {
         return this._roomName;
     }
 
-    get roomAvatarUrl(): string | null {
+    get roomAvatarUrl(): string | undefined {
         if (this._members.size === 1) {
             for (const member of this._members.values()) {
                 return member.avatarUrl;
             }
         }
-        return null;
     }
 
     /**
