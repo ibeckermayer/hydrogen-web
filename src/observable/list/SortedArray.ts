@@ -87,7 +87,7 @@ export class SortedArray<T> extends BaseObservableList<T> {
         const idx = sortedIndex(this._items, item, this._comparator);
         if (idx >= this._items.length || this._comparator(this._items[idx], item) !== 0) {
             this._items.splice(idx, 0, item);
-            this.emitAdd(idx, item)
+            this.emitAdd(idx, item);
         } else {
             this._items[idx] = item;
             this.emitUpdate(idx, item, updateParams);
@@ -112,7 +112,7 @@ export class SortedArray<T> extends BaseObservableList<T> {
         return this._items.length;
     }
 
-    [Symbol.iterator]() {
+    [Symbol.iterator](): Iterator<T> {
         return new Iterator(this);
     }
 }
@@ -127,7 +127,7 @@ class Iterator<T> {
         this._current = null;
     }
 
-    next() {
+    next(): IteratorResult<T, any> {
         if (this._sortedArray) {
             if (this._current) {
                 this._current = this._sortedArray._getNext(this._current);
@@ -141,23 +141,22 @@ class Iterator<T> {
                 this._sortedArray = null;
             }
         }
-        if (!this._sortedArray) {
-            return {done: true};
-        }
+        return {done: true, value: undefined};
     }
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function tests() {
     return {
-        "setManyUnsorted": assert => {
+        "setManyUnsorted": (assert): void => {
             const sa = new SortedArray<string>((a, b) => a.localeCompare(b));
             sa.setManyUnsorted(["b", "a", "c"]);
             assert.equal(sa.length, 3);
             assert.equal(sa.get(0), "a");
             assert.equal(sa.get(1), "b");
             assert.equal(sa.get(2), "c");
-        }, 
-        "_getNext": assert => {
+        },
+        "_getNext": (assert): void => {
             const sa = new SortedArray<string>((a, b) => a.localeCompare(b));
             sa.setManyUnsorted(["b", "a", "f"]);
             assert.equal(sa._getNext("a"), "b");
@@ -166,7 +165,7 @@ export function tests() {
             assert.equal(sa._getNext("c"), "f");
             assert.equal(sa._getNext("f"), undefined);
         },
-        "iterator with removals": assert => {
+        "iterator with removals": (assert): void => {
             const queue = new SortedArray<{idx: number}>((a, b) => a.idx - b.idx);
             queue.setManyUnsorted([{idx: 5}, {idx: 3}, {idx: 1}, {idx: 4}, {idx: 2}]);
             const it = queue[Symbol.iterator]();
@@ -183,5 +182,5 @@ export function tests() {
             // check done persists
             assert.equal(it.next().done, true);
         }
-    }
+    };
 }

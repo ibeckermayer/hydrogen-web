@@ -37,23 +37,22 @@ export enum SendStatus {
 
 const unencryptedContentFields = [ "m.relates_to" ];
 
-type PendingEventData = PendingEntry & {
+export type PendingEventData = PendingEntry & {
     remoteId: string | null;
-    relatedTxnId: string | null;
-    encryptedEventType: string;
-    encryptedContent: EncryptedContent
+    encryptedEventType?: string;
+    encryptedContent?: EncryptedContent
 };
 
 type PendingEventOptions = {
     data: PendingEventData;
     remove: VoidFunction;
     emitUpdate: (params: any) => void;
-    attachments?: Record<string, AttachmentUpload>;
+    attachments: Record<string, AttachmentUpload> | null;
 }
 
 export class PendingEvent {
     private _data: PendingEventData;
-    private _attachments?: Record<string, AttachmentUpload>;
+    private _attachments: Record<string, AttachmentUpload> | null;
     private _emitUpdate: (params: any) => void;
     private _removeFromQueueCallback: VoidFunction;
     private _error: any;

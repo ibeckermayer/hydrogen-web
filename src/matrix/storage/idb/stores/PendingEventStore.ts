@@ -24,12 +24,12 @@ export interface PendingEntry {
     queueIndex: number;
     eventType: string;
     content: Content;
-    relatexTxnId: string | null;
+    relatedTxnId: string | null;
     relatedEventId: string | null;
     txnId?: string;
     needsEncryption: boolean;
     needsUpload: boolean;
-    key: string;
+    key?: string;
 }
 
 function encodeKey(roomId: string, queueIndex: number): string {
@@ -62,7 +62,7 @@ export class PendingEventStore {
         }
     }
 
-    remove(roomId: string, queueIndex: number) {
+    remove(roomId: string, queueIndex: number): void {
         const keyRange = this._eventStore.IDBKeyRange.only(encodeKey(roomId, queueIndex));
         this._eventStore.delete(keyRange);
     }
