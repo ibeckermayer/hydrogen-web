@@ -16,7 +16,7 @@ limitations under the License.
 
 import {SortedArray} from "../../../observable/list/SortedArray";
 import {ConnectionError} from "../../error.js";
-import {PendingEvent, SendStatus} from "./PendingEvent.js";
+import {PendingEvent, SendStatus} from "./PendingEvent";
 import {makeTxnId, isTxnId} from "../../common.js";
 import {REDACTION_TYPE} from "../common";
 import {getRelationFromContent, getRelationTarget, setRelationTarget, REACTION_TYPE, ANNOTATION_RELATION_TYPE} from "../timeline/relations.js";
@@ -445,6 +445,6 @@ export function tests() {
             await queue.enqueueEvent("m.reaction", createAnnotation("!target", "🚀"), null, new NullLogItem());
             assert.equal(queue.pendingEvents.length, 2);
         },
-        
+
     }
 }

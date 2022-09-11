@@ -19,7 +19,7 @@ import {KeyLimits} from "../../common";
 import {Store} from "../Store";
 import {Content} from "../../types";
 
-interface PendingEntry {
+export interface PendingEntry {
     roomId: string;
     queueIndex: number;
     eventType: string;
@@ -72,7 +72,7 @@ export class PendingEventStore {
         const key = await this._eventStore.getKey(keyRange);
         return !!key;
     }
-    
+
     add(pendingEvent: PendingEntry): void {
         pendingEvent.key = encodeKey(pendingEvent.roomId, pendingEvent.queueIndex);
         this._eventStore.add(pendingEvent);
