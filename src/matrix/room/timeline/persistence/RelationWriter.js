@@ -17,7 +17,7 @@ limitations under the License.
 import {EventEntry} from "../entries/EventEntry.js";
 import {REDACTION_TYPE, isRedacted} from "../../common";
 import {ANNOTATION_RELATION_TYPE, getRelation} from "../relations.js";
-import {redactEvent} from "../common.js";
+import {redactEvent} from "../common";
 
 export class RelationWriter {
     constructor({roomId, ownUserId, fragmentIdComparer}) {
@@ -242,7 +242,7 @@ export function tests() {
             assert.equal(redactedMessage.id, "!abc");
             assert.equal(redactedMessage.content.body, undefined);
             assert.equal(redactedMessage.redactionReason, reason);
-            
+
             const readTxn = await storage.readTxn([storage.storeNames.timelineEvents]);
             const storedMessage = await readTxn.timelineEvents.getByEventId(roomId, "!abc");
             await readTxn.complete();
@@ -269,7 +269,7 @@ export function tests() {
             assert.equal(annotation.me, true);
             assert.equal(annotation.count, 1);
             assert.equal(annotation.firstTimestamp, 5);
-            
+
             const readTxn = await storage.readTxn([storage.storeNames.timelineEvents]);
             const storedMessage = await readTxn.timelineEvents.getByEventId(roomId, "!abc");
             await readTxn.complete();
@@ -340,6 +340,6 @@ export function tests() {
             await readTxn.complete();
             assert.equal(storedMessage.annotations["🐶"].count, 1);
         },
-        
+
     }
 }

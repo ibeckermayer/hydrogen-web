@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import {TemplateView} from "../general/TemplateView";
-import {spinner} from "../common.js";
+import {spinner} from "../common";
 import {AccountSetupView} from "./AccountSetupView.js";
 
 /** a view used both in the login view and the loading screen

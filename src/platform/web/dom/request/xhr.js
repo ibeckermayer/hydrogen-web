@@ -18,7 +18,7 @@ import {
     AbortError,
     ConnectionError
 } from "../../../../matrix/error.js";
-import {addCacheBuster, mapAsFormData} from "./common.js";
+import {addCacheBuster, mapAsFormData} from "./common";
 
 class RequestResult {
     constructor(promise, xhr) {
@@ -43,7 +43,7 @@ function createXhr(url, {method, headers, timeout, format, uploadProgress}) {
     }
 
     xhr.open(method, url);
-    
+
     if (format === "buffer") {
         // important to call this after calling open
         xhr.responseType = "arraybuffer";

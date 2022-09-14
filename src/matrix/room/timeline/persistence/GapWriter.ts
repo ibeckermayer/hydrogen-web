@@ -19,6 +19,8 @@ import {EventEntry} from "../entries/EventEntry.js";
 import {createEventEntry, directionalAppend} from "./common";
 import {RoomMember, EVENT_TYPE as MEMBER_EVENT_TYPE} from "../../members/RoomMember.js";
 
+type Options = {roomId: string, storage: Storage, fragmentIdComparer: FragmentIdComparer, relationWriter: RelationWriter}
+
 export class GapWriter {
     constructor({roomId, storage, fragmentIdComparer, relationWriter}) {
         this._roomId = roomId;
