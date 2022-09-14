@@ -22,6 +22,8 @@ type EventEnry = {
     eventIndex: number;
     roomId: string;
     event: any;
+    displayName?: string;
+    avatarUrl?: string;
 };
 
 export function createEventEntry(

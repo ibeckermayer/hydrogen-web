@@ -28,7 +28,7 @@ interface Fragment {
     nextToken: string | null;
 }
 
-type FragmentEntry = Fragment & { key: string }
+export type FragmentEntry = Fragment & { key: string }
 
 function encodeKey(roomId: string, fragmentId: number): string {
     return `${roomId}|${encodeUint32(fragmentId)}`;
