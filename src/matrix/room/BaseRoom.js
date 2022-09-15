@@ -17,7 +17,7 @@ limitations under the License.
 import {EventEmitter} from "../../utils/EventEmitter";
 import {RoomSummary} from "./RoomSummary.js";
 import {GapWriter} from "./timeline/persistence/GapWriter";
-import {RelationWriter} from "./timeline/persistence/RelationWriter.js";
+import {RelationWriter} from "./timeline/persistence/RelationWriter";
 import {Timeline} from "./timeline/Timeline.js";
 import {FragmentIdComparer} from "./timeline/FragmentIdComparer.js";
 import {WrappedError} from "../error.js"

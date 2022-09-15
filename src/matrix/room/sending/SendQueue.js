@@ -19,7 +19,7 @@ import {ConnectionError} from "../../error.js";
 import {PendingEvent, SendStatus} from "./PendingEvent.js";
 import {makeTxnId, isTxnId} from "../../common";
 import {REDACTION_TYPE} from "../common";
-import {getRelationFromContent, getRelationTarget, setRelationTarget, REACTION_TYPE, ANNOTATION_RELATION_TYPE} from "../timeline/relations.js";
+import {getRelationFromContent, getRelationTarget, setRelationTarget, REACTION_TYPE, ANNOTATION_RELATION_TYPE} from "../timeline/relations";
 
 export class SendQueue {
     constructor({roomId, storage, hsApi, pendingEvents}) {
@@ -210,7 +210,7 @@ export class SendQueue {
             const relationTarget = getRelationTarget(relation);
             if (isTxnId(relationTarget)) {
                 relatedTxnId = relationTarget;
-                setRelationTarget(relation, null);
+                setRelationTarget(relation, undefined);
             }
             if (relation.rel_type === ANNOTATION_RELATION_TYPE) {
                 // Here we know the shape of the relation, and can use event_id safely
@@ -356,7 +356,7 @@ import {ListObserver} from "../../../mocks/ListObserver.js";
 import {NullLogger, NullLogItem} from "../../../logging/NullLogger";
 import {createEvent, withTextBody, withTxnId} from "../../../mocks/event.js";
 import {poll} from "../../../mocks/poll.js";
-import {createAnnotation} from "../timeline/relations.js";
+import {createAnnotation} from "../timeline/relations";
 
 export function tests() {
     const logger = new NullLogger();

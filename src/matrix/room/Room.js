@@ -17,7 +17,7 @@ limitations under the License.
 import {BaseRoom} from "./BaseRoom.js";
 import {SyncWriter} from "./timeline/persistence/SyncWriter.js";
 import {MemberWriter} from "./timeline/persistence/MemberWriter";
-import {RelationWriter} from "./timeline/persistence/RelationWriter.js";
+import {RelationWriter} from "./timeline/persistence/RelationWriter";
 import {SendQueue} from "./sending/SendQueue.js";
 import {WrappedError} from "../error.js"
 import {Heroes} from "./members/Heroes.js";
