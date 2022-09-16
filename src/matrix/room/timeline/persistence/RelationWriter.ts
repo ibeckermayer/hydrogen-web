@@ -18,6 +18,15 @@ import {EventEntry} from "../entries/EventEntry";
 import {REDACTION_TYPE, isRedacted} from "../../common";
 import {ANNOTATION_RELATION_TYPE, getRelation, Relation} from "../relations";
 import {redactEvent} from "../common";
+import {createEvent, withTextBody, withRedacts, withContent} from "../../../../mocks/event";
+import {createAnnotation} from "../relations";
+import {FragmentIdComparer} from "../FragmentIdComparer";
+import {NullLogger, NullLogItem} from "../../../../logging/NullLogger";
+import {ILogItem} from "../../../../logging/types";
+import {Transaction} from "../../../storage/idb/Transaction";
+import {Direction} from "../Direction";
+import {TimelineEventEntry} from "../../../storage/idb/stores/TimelineEventStore";
+import {StateEvent, TimelineEvent} from "../../../storage/types";
 
 type Options = {roomId: string, ownUserId: string, fragmentIdComparer: FragmentIdComparer};
 
@@ -214,15 +223,6 @@ function isObjectEmpty(obj: {}): boolean {
 
 
 import {createMockStorage} from "../../../../mocks/Storage";
-import {createEvent, withTextBody, withRedacts, withContent} from "../../../../mocks/event";
-import {createAnnotation} from "../relations";
-import {FragmentIdComparer} from "../FragmentIdComparer";
-import {NullLogger, NullLogItem} from "../../../../logging/NullLogger";
-import { ILogItem } from "../../../../logging/types";
-import { Transaction } from "../../../storage/idb/Transaction";
-import { Direction } from "../Direction";
-import { TimelineEventEntry } from "../../../storage/idb/stores/TimelineEventStore";
-import { StateEvent, TimelineEvent } from "../../../storage/types";
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function tests() {
