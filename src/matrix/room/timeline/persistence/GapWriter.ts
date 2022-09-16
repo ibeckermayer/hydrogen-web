@@ -334,7 +334,7 @@ export function tests() {
         const {txn, timelineMock, syncWriter, fragmentIdComparer} = mocks;
         const syncResponse = timelineMock.sync(previous?.next_batch, limit);
         const {newLiveKey} = await syncWriter.writeSync(syncResponse, false, false, txn, logger);
-        syncWriter.afterSync(newLiveKey);
+        syncWriter.afterSync(newLiveKey!);
         return {
             syncResponse,
             fragmentEntry: newLiveKey ? FragmentBoundaryEntry.start(

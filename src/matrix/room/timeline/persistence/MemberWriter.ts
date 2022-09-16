@@ -65,7 +65,7 @@ export class MemberWriter {
     }
 }
 
-class MemberSync {
+export class MemberSync {
     private _memberWriter: MemberWriter;
     private _stateEvents: StateEvent[];
     private _timelineEvents: StateEvent[];

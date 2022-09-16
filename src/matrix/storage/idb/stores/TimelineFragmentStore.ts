@@ -19,7 +19,7 @@ import {KeyLimits} from "../../common";
 import { encodeUint32 } from "../utils";
 import {Store} from "../Store";
 
-interface Fragment {
+export interface Fragment {
     roomId: string;
     id: number;
     previousId: number | null;
