@@ -20,7 +20,7 @@ import {GapWriter} from "./timeline/persistence/GapWriter";
 import {RelationWriter} from "./timeline/persistence/RelationWriter";
 import {Timeline} from "./timeline/Timeline.js";
 import {FragmentIdComparer} from "./timeline/FragmentIdComparer.js";
-import {WrappedError} from "../error.js"
+import {WrappedError} from "../error.js";
 import {fetchOrLoadMembers, fetchOrLoadMember} from "./members/load.js";
 import {MemberList} from "./members/MemberList.js";
 import {Heroes} from "./members/Heroes.js";
@@ -574,7 +574,7 @@ export class BaseRoom extends EventEmitter {
     }
 }
 
-class DecryptionRequest {
+export class DecryptionRequest {
     constructor(decryptFn, log) {
         this._cancelled = false;
         this.preparation = null;
