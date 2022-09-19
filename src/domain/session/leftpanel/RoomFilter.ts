@@ -13,14 +13,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import {BaseTileViewModel} from "./BaseTileViewModel";
 
 export class RoomFilter {
-    constructor(query) {
+    private _parts: string[];
+
+    constructor(query: string) {
         this._parts = query.split(" ").map(s => s.toLowerCase().trim());
     }
 
-    matches(roomTileVM) {
-        const name = roomTileVM.name.toLowerCase();
+    matches(baseTileVM: BaseTileViewModel): boolean {
+        const name = baseTileVM.name.toLowerCase();
         return this._parts.every(p => name.includes(p));
     }
 }

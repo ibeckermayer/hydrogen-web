@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {LeftPanelViewModel} from "./leftpanel/LeftPanelViewModel.js";
+import {LeftPanelViewModel} from "./leftpanel/LeftPanelViewModel";
 import {RoomViewModel} from "./room/RoomViewModel";
 import {UnknownRoomViewModel} from "./room/UnknownRoomViewModel";
 import {InviteViewModel} from "./room/InviteViewModel";
@@ -27,7 +27,8 @@ import {SettingsViewModel} from "./settings/SettingsViewModel.js";
 import {CreateRoomViewModel} from "./CreateRoomViewModel";
 import {ViewModel} from "../ViewModel";
 import {RoomViewModelObservable} from "./RoomViewModelObservable.js";
-import {RightPanelViewModel} from "./rightpanel/RightPanelViewModel.js";
+import {RightPanelViewModel} from "./rightpanel/RightPanelViewModel";
+import {SyncStatus} from "../../matrix/Sync";
 
 export class SessionViewModel extends ViewModel {
     constructor(options) {
@@ -45,6 +46,7 @@ export class SessionViewModel extends ViewModel {
         this._gridViewModel = null;
         this._createRoomViewModel = null;
         this._setupNavigation();
+        this._setupForcedLogoutOnAccessTokenInvalidation();
     }
 
     _setupNavigation() {
@@ -91,6 +93,23 @@ export class SessionViewModel extends ViewModel {
         const rightpanel = this.navigation.observe("right-panel");
         this.track(rightpanel.subscribe(() => this._updateRightPanel()));
         this._updateRightPanel();
+    }
+
+    _setupForcedLogoutOnAccessTokenInvalidation() {
+        this.track(this._client.sync.status.subscribe(status => {
+            if (status === SyncStatus.Stopped) {
+                const error = this._client.sync.error;
+                if (error?.errcode === "M_UNKNOWN_TOKEN") {
+                    // Access token is no longer valid, so force the user to log out
+                    const segments = [
+                        this.navigation.segment("logout", this.id),
+                        this.navigation.segment("forced", true),
+                    ];
+                    const path = this.navigation.pathFrom(segments);
+                    this.navigation.applyPath(path);
+                }
+            }
+        }));
     }
 
     get id() {
