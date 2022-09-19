@@ -18,14 +18,11 @@ import {AbortError} from "../utils/error";
 import {BaseObservable} from "./BaseObservable";
 import type {SubscriptionHandle} from "./BaseObservable";
 
-type SyncValueHandler<T> = (value: T) => void;
-type AsyncValueHandler<T> = (value: T) => Promise<void>;
-
 // like an EventEmitter, but doesn't have an event type
-export abstract class BaseObservableValue<T> extends BaseObservable<SyncValueHandler<T> | AsyncValueHandler<T>> {
+export abstract class BaseObservableValue<T> extends BaseObservable<(value: T) => void> {
     emit(argument: T): void {
         for (const h of this._handlers) {
-            void h(argument);
+            h(argument);
         }
     }
 
