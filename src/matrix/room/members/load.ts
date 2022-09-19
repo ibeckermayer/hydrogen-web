@@ -57,7 +57,7 @@ async function fetchMembers(
         storage.storeNames.roomMembers,
     ]);
 
-    let summaryChanges: SummaryData[];
+    let summaryChanges: SummaryData;
     let members: (RoomMember | undefined)[] = [];
 
     try {

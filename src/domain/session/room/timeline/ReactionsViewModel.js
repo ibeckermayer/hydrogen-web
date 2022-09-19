@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import {ObservableMap} from "../../../../observable/map/ObservableMap";
+import {ObservableMap} from "../../../../observable";
 
 export class ReactionsViewModel {
     constructor(parentTile) {
@@ -172,25 +172,25 @@ class ReactionViewModel {
 }
 
 // matrix classes uses in the integration test below
-import {User} from "../../../../matrix/User.js";
-import {SendQueue} from "../../../../matrix/room/sending/SendQueue.js";
-import {Timeline} from "../../../../matrix/room/timeline/Timeline.js";
-import {EventEntry} from "../../../../matrix/room/timeline/entries/EventEntry.js";
-import {RelationWriter} from "../../../../matrix/room/timeline/persistence/RelationWriter.js";
-import {FragmentIdComparer} from "../../../../matrix/room/timeline/FragmentIdComparer.js";
-import {createAnnotation} from "../../../../matrix/room/timeline/relations.js";
+import {User} from "../../../../matrix/User";
+import {SendQueue} from "../../../../matrix/room/sending/SendQueue";
+import {Timeline} from "../../../../matrix/room/timeline/Timeline";
+import {EventEntry} from "../../../../matrix/room/timeline/entries/EventEntry";
+import {RelationWriter} from "../../../../matrix/room/timeline/persistence/RelationWriter";
+import {FragmentIdComparer} from "../../../../matrix/room/timeline/FragmentIdComparer";
+import {createAnnotation} from "../../../../matrix/room/timeline/relations";
 // mocks
-import {Clock as MockClock} from "../../../../mocks/Clock.js";
+import {Clock as MockClock} from "../../../../mocks/Clock";
 import {createMockStorage} from "../../../../mocks/Storage";
-import {ListObserver} from "../../../../mocks/ListObserver.js";
-import {createEvent, withTextBody, withContent} from "../../../../mocks/event.js";
+import {ListObserver} from "../../../../mocks/ListObserver";
+import {createEvent, withTextBody, withContent} from "../../../../mocks/event";
 import {NullLogItem, NullLogger} from "../../../../logging/NullLogger";
-import {HomeServer as MockHomeServer} from "../../../../mocks/HomeServer.js";
+import {HomeServer as MockHomeServer} from "../../../../mocks/HomeServer";
 // other imports
-import {BaseMessageTile} from "./tiles/BaseMessageTile.js";
+import {BaseMessageTile} from "./tiles/BaseMessageTile";
 import {MappedList} from "../../../../observable/list/MappedList";
 import {ObservableValue} from "../../../../observable/ObservableValue";
-import {PowerLevels} from "../../../../matrix/room/PowerLevels.js";
+import {PowerLevels} from "../../../../matrix/room/PowerLevels";
 
 export function tests() {
     const fragmentIdComparer = new FragmentIdComparer([]);

@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {verifyEd25519Signature, SIGNATURE_ALGORITHM} from "./common.js";
-import {HistoryVisibility, shouldShareKey} from "./common.js";
+import {verifyEd25519Signature, SIGNATURE_ALGORITHM} from "./common";
+import {HistoryVisibility, shouldShareKey} from "./common";
 import {RoomMember} from "../room/members/RoomMember";
 
 const TRACKING_STATUS_OUTDATED = 0;

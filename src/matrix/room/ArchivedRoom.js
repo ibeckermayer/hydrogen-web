@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {reduceStateEvents} from "./RoomSummary.js";
-import {BaseRoom} from "./BaseRoom.js";
+import {reduceStateEvents} from "./RoomSummary";
+import {BaseRoom} from "./BaseRoom";
 import {RoomMember, EVENT_TYPE as MEMBER_EVENT_TYPE} from "./members/RoomMember";
 
 export class ArchivedRoom extends BaseRoom {

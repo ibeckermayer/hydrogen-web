@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 import {EventKey} from "../EventKey";
-import {EventEntry} from "../entries/EventEntry.js";
-import {createEventEntry, directionalAppend} from "./common.js";
+import {EventEntry} from "../entries/EventEntry";
+import {createEventEntry, directionalAppend} from "./common";
 import {RoomMember, EVENT_TYPE as MEMBER_EVENT_TYPE} from "../../members/RoomMember";
 
 export class GapWriter {
@@ -201,14 +201,14 @@ export class GapWriter {
     }
 }
 
-import {FragmentIdComparer} from "../FragmentIdComparer.js";
-import {RelationWriter} from "./RelationWriter.js";
+import {FragmentIdComparer} from "../FragmentIdComparer";
+import {RelationWriter} from "./RelationWriter";
 import {createMockStorage} from "../../../../mocks/Storage";
-import {FragmentBoundaryEntry} from "../entries/FragmentBoundaryEntry.js";
+import {FragmentBoundaryEntry} from "../entries/FragmentBoundaryEntry";
 import {NullLogItem} from "../../../../logging/NullLogger";
 import {TimelineMock, eventIds, eventId} from "../../../../mocks/TimelineMock.ts";
-import {SyncWriter} from "./SyncWriter.js";
-import {MemberWriter} from "./MemberWriter.js";
+import {SyncWriter} from "./SyncWriter";
+import {MemberWriter} from "./MemberWriter";
 import {KeyLimits} from "../../../storage/common";
 
 export function tests() {

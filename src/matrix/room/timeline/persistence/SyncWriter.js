@@ -16,9 +16,9 @@ limitations under the License.
 */
 
 import {EventKey} from "../EventKey";
-import {EventEntry} from "../entries/EventEntry.js";
-import {FragmentBoundaryEntry} from "../entries/FragmentBoundaryEntry.js";
-import {createEventEntry} from "./common.js";
+import {EventEntry} from "../entries/EventEntry";
+import {FragmentBoundaryEntry} from "../entries/FragmentBoundaryEntry";
+import {createEventEntry} from "./common";
 import {EVENT_TYPE as MEMBER_EVENT_TYPE} from "../../members/RoomMember";
 
 // Synapse bug? where the m.room.create event appears twice in sync response
@@ -257,7 +257,7 @@ export class SyncWriter {
 }
 
 import {createMockStorage} from "../../../../mocks/Storage";
-import {createEvent, withTextBody} from "../../../../mocks/event.js";
+import {createEvent, withTextBody} from "../../../../mocks/event";
 import {Instance as nullLogger} from "../../../../logging/NullLogger";
 export function tests() {
     const roomId = "!abc:hs.tld";
