@@ -261,7 +261,7 @@ export class SendQueue {
 
     async _enqueueEvent(
         eventType: string,
-        content: { "m.relates_to"?: Relation; reason?: any; body?: string; },
+        content: EventContent,
         attachments: Record<string, AttachmentUpload> | null,
         relatedTxnId: string | undefined,
         relatedEventId: string | undefined,

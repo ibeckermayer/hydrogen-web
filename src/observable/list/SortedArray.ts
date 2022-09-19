@@ -119,29 +119,24 @@ export class SortedArray<T> extends BaseObservableList<T> {
 
 // iterator that works even if the current value is removed while iterating
 class Iterator<T> {
-    private _sortedArray: SortedArray<T> | null
-    private _current: T | null | undefined
+    private _sortedArray: SortedArray<T>;
+    private _current: T | null | undefined;
+    private _consumed: boolean = false;
 
     constructor(sortedArray: SortedArray<T>) {
         this._sortedArray = sortedArray;
         this._current = null;
     }
 
-    next(): IteratorResult<T, any> {
-        if (this._sortedArray) {
-            if (this._current) {
-                this._current = this._sortedArray._getNext(this._current);
-            } else {
-                this._current = this._sortedArray.get(0);
-            }
-            if (this._current) {
-                return {value: this._current};
-            } else {
-                // cause done below
-                this._sortedArray = null;
-            }
+    next(): IteratorResult<T> {
+        if (this._consumed) {
+            return {value: undefined, done: true};
         }
-        return {done: true, value: undefined};
+        this._current = this._current? this._sortedArray._getNext(this._current): this._sortedArray.get(0);
+        if (!this._current) {
+            this._consumed = true;
+        }
+        return { value: this._current, done: this._consumed } as IteratorResult<T>;
     }
 }
 
