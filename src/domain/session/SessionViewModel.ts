@@ -28,6 +28,7 @@ import {CreateRoomViewModel} from "./CreateRoomViewModel";
 import {ViewModel} from "../ViewModel";
 import {RoomViewModelObservable} from "./RoomViewModelObservable";
 import {RightPanelViewModel} from "./rightpanel/RightPanelViewModel";
+import {SyncStatus} from "../../matrix/Sync";
 
 import type {Options as ViewModelOptions} from "../ViewModel";
 import type {Client} from "../../matrix/Client";
@@ -60,6 +61,7 @@ export class SessionViewModel extends ViewModel {
         })));
         this._leftPanelViewModel = this.track(new LeftPanelViewModel(this.childOptions({session: this.client.session})));
         this._setupNavigation();
+        this._setupForcedLogoutOnAccessTokenInvalidation();
     }
 
     _setupNavigation(): void {
@@ -106,6 +108,23 @@ export class SessionViewModel extends ViewModel {
         const rightpanel = this.navigation.observe("right-panel");
         this.track(rightpanel.subscribe(() => this._updateRightPanel()));
         this._updateRightPanel();
+    }
+
+    _setupForcedLogoutOnAccessTokenInvalidation() {
+        this.track(this.client.sync.status.subscribe(status => {
+            if (status === SyncStatus.Stopped) {
+                const error = this.client.sync.error;
+                if (error?.errcode === "M_UNKNOWN_TOKEN") {
+                    // Access token is no longer valid, so force the user to log out
+                    const segments = [
+                        this.navigation.segment("logout", this.id as unknown as true),
+                        this.navigation.segment("forced", true),
+                    ];
+                    const path = this.navigation.pathFrom(segments);
+                    this.navigation.applyPath(path);
+                }
+            }
+        }));
     }
 
     get id(): string {
