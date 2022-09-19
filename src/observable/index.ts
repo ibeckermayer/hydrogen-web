@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Matrix.org Foundation C.I.C.
+Copyright 2020 Bruno Windels <bruno@windels.cloud>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export function imageToInfo(image) {
-    return {
-        w: image.width,
-        h: image.height,
-        mimetype: image.blob.mimeType,
-        size: image.blob.size
-    };
-}
+
+// re-export "root" (of chain) collection
+export { ObservableMap, ApplyMap, FilteredMap, JoinedMap, LogMap, MappedMap } from "./map";
+export { ObservableArray } from "./list/ObservableArray";
+export { SortedArray } from "./list/SortedArray";
+export { MappedList } from "./list/MappedList";
+export { AsyncMappedList } from "./list/AsyncMappedList";
+export { ConcatList } from "./list/ConcatList";

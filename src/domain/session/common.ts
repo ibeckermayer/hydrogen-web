@@ -1,5 +1,5 @@
 /*
-Copyright 2020, 2021 The Matrix.org Foundation C.I.C.
+Copyright 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export function comparePrimitive(a, b) {
-    if (a === b) {
-        return 0;
-    } else {
-        return a < b ? -1 : 1;
+type Image = {
+    width: number;
+    height: number;
+    blob: {
+        mimeType: string,
+        size: number
     }
+}
+
+export type MultiMediaInfo = {
+    w: number;
+    h: number;
+    mimetype: string,
+    size: number,
+    thumbnail_info?: MultiMediaInfo,
+    duration?: number
+}
+
+export function imageToInfo(image: Image): MultiMediaInfo {
+    return {
+        w: image.width,
+        h: image.height,
+        mimetype: image.blob.mimeType,
+        size: image.blob.size
+    };
 }
