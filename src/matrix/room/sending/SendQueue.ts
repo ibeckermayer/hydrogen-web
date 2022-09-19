@@ -15,41 +15,67 @@ limitations under the License.
 */
 
 import {SortedArray} from "../../../observable/list/SortedArray";
-import {ConnectionError} from "../../error.js";
-import {PendingEvent, SendStatus} from "./PendingEvent.js";
-import {makeTxnId, isTxnId} from "../../common.js";
+import {ConnectionError} from "../../error";
+import {PendingEvent, PendingEventData, SendStatus} from "./PendingEvent";
+import {makeTxnId, isTxnId} from "../../common";
 import {REDACTION_TYPE} from "../common";
-import {getRelationFromContent, getRelationTarget, setRelationTarget, REACTION_TYPE, ANNOTATION_RELATION_TYPE} from "../timeline/relations.js";
+import {getRelationFromContent, getRelationTarget, setRelationTarget, REACTION_TYPE, ANNOTATION_RELATION_TYPE, Relation} from "../timeline/relations";
+import type {RoomEncryption} from "../../e2ee/RoomEncryption";
+import type {AttachmentUpload} from "../AttachmentUpload";
+import type {ILogItem} from "../../../logging/types";
+import type {HomeServerApi} from "../../net/HomeServerApi";
+import type {Transaction} from "../../storage/idb/Transaction";
+import type {TimelineEvent} from "../../storage/types";
+import type {Storage} from "../../storage/idb/Storage";
+
+type EventContent = { "m.relates_to"?: Relation; reason?: any; body?: string; }
+
+type Options = {
+    roomId: string;
+    storage: Storage;
+    hsApi: HomeServerApi;
+    pendingEvents?: PendingEventData[];
+};
 
 export class SendQueue {
-    constructor({roomId, storage, hsApi, pendingEvents}) {
+    private _roomId: string;
+    private _storage: Storage;
+    private _hsApi: HomeServerApi;
+    private _pendingEvents: SortedArray<PendingEvent>;
+    private _roomEncryption?: RoomEncryption;
+    private _sendLoopLogItem?: ILogItem;
+    private _isSending = false;
+    private _offline = false;
+    private _currentQueueIndex = 0;
+
+    constructor({roomId, storage, hsApi, pendingEvents}: Options) {
         pendingEvents = pendingEvents || [];
         this._roomId = roomId;
         this._storage = storage;
         this._hsApi = hsApi;
         this._pendingEvents = new SortedArray((a, b) => a.queueIndex - b.queueIndex);
         this._pendingEvents.setManyUnsorted(pendingEvents.map(data => this._createPendingEvent(data)));
-        this._isSending = false;
-        this._offline = false;
-        this._roomEncryption = null;
-        this._currentQueueIndex = 0;
     }
 
-    _createPendingEvent(data, attachments = null) {
+    get isSending(): boolean {
+        return this._isSending;
+    }
+
+    _createPendingEvent(data: PendingEventData, attachments: Record<string, AttachmentUpload> | null = null): PendingEvent {
         const pendingEvent = new PendingEvent({
             data,
-            remove: () => this._removeEvent(pendingEvent),
-            emitUpdate: params => this._pendingEvents.update(pendingEvent, params),
+            remove: (): Promise<void> => this._removeEvent(pendingEvent),
+            emitUpdate: (params): void => this._pendingEvents.update(pendingEvent, params),
             attachments
         });
         return pendingEvent;
     }
 
-    enableEncryption(roomEncryption) {
+    enableEncryption(roomEncryption: RoomEncryption): void {
         this._roomEncryption = roomEncryption;
     }
 
-    _sendLoop(log) {
+    _sendLoop(log: ILogItem): void {
         this._isSending = true;
         this._sendLoopLogItem = log.runDetached("send queue flush", async log => {
             try {
@@ -85,12 +111,12 @@ export class SendQueue {
                 }
             } finally {
                 this._isSending = false;
-                this._sendLoopLogItem = null;
+                this._sendLoopLogItem = undefined;
             }
         });
     }
 
-    async _sendEvent(pendingEvent, log) {
+    async _sendEvent(pendingEvent: PendingEvent, log: ILogItem): Promise<void> {
         if (pendingEvent.needsUpload) {
             await log.wrap("upload attachments", log => pendingEvent.uploadAttachments(this._hsApi, log));
             await this._tryUpdateEvent(pendingEvent);
@@ -115,7 +141,7 @@ export class SendQueue {
             try {
                 await this._tryUpdateEventWithTxn(pendingEvent, txn);
                 await this._resolveRemoteIdInPendingRelations(
-                    pendingEvent.txnId, pendingEvent.remoteId, txn);
+                    pendingEvent.txnId!, pendingEvent.remoteId!, txn);
             } catch (err) {
                 txn.abort();
                 throw err;
@@ -124,7 +150,7 @@ export class SendQueue {
         }
     }
 
-    async _resolveRemoteIdInPendingRelations(txnId, remoteId, txn) {
+    async _resolveRemoteIdInPendingRelations(txnId: string, remoteId: string, txn: Transaction): Promise<PendingEvent[]> {
         const relatedEventWithoutRemoteId = this._pendingEvents.array.filter(pe => {
             return pe.relatedTxnId === txnId && pe.relatedEventId !== remoteId;
         });
@@ -135,11 +161,11 @@ export class SendQueue {
         return relatedEventWithoutRemoteId;
     }
 
-    async removeRemoteEchos(events, txn, parentLog) {
-        const removed = [];
+    async removeRemoteEchos(events: TimelineEvent[], txn: Transaction, parentLog: ILogItem): Promise<PendingEvent[]> {
+        const removed: PendingEvent[] = [];
         for (const event of events) {
             const txnId = event.unsigned && event.unsigned.transaction_id;
-            let idx;
+            let idx: number;
             if (txnId) {
                 idx = this._pendingEvents.array.findIndex(pe => pe.txnId === txnId);
             } else {
@@ -148,16 +174,16 @@ export class SendQueue {
             if (idx !== -1) {
                 const pendingEvent = this._pendingEvents.get(idx);
                 const remoteId = event.event_id;
-                parentLog.log({l: "removeRemoteEcho", queueIndex: pendingEvent.queueIndex, remoteId, txnId});
-                txn.pendingEvents.remove(pendingEvent.roomId, pendingEvent.queueIndex);
-                removed.push(pendingEvent);
+                parentLog.log({l: "removeRemoteEcho", queueIndex: pendingEvent!.queueIndex, remoteId, txnId});
+                txn.pendingEvents.remove(pendingEvent!.roomId, pendingEvent!.queueIndex);
+                removed.push(pendingEvent!);
                 await this._resolveRemoteIdInPendingRelations(txnId, remoteId, txn);
             }
         }
         return removed;
     }
 
-    async _removeEvent(pendingEvent) {
+    async _removeEvent(pendingEvent: PendingEvent): Promise<void> {
         let hasEvent = this._pendingEvents.array.indexOf(pendingEvent) !== -1;
         if (hasEvent) {
             const txn = await this._storage.readWriteTxn([this._storage.storeNames.pendingEvents]);
@@ -177,7 +203,7 @@ export class SendQueue {
         pendingEvent.dispose();
     }
 
-    emitRemovals(pendingEvents) {
+    emitRemovals(pendingEvents: PendingEvent[]): void {
         for (const pendingEvent of pendingEvents) {
             const idx = this._pendingEvents.array.indexOf(pendingEvent);
             if (idx !== -1) {
@@ -187,7 +213,7 @@ export class SendQueue {
         }
     }
 
-    resumeSending(parentLog) {
+    resumeSending(parentLog: ILogItem): void {
         this._offline = false;
         if (this._pendingEvents.length) {
             parentLog.wrap("resumeSending", log => {
@@ -203,19 +229,24 @@ export class SendQueue {
         }
     }
 
-    async enqueueEvent(eventType, content, attachments, log) {
+    async enqueueEvent(
+        eventType: string,
+        content: EventContent,
+        attachments: Record<string, AttachmentUpload> | null,
+        log: ILogItem | NullLogItem
+    ): Promise<void> {
         const relation = getRelationFromContent(content);
-        let relatedTxnId = null;
+        let relatedTxnId: string | undefined;
         if (relation) {
             const relationTarget = getRelationTarget(relation);
             if (isTxnId(relationTarget)) {
                 relatedTxnId = relationTarget;
-                setRelationTarget(relation, null);
+                setRelationTarget(relation, undefined);
             }
             if (relation.rel_type === ANNOTATION_RELATION_TYPE) {
                 // Here we know the shape of the relation, and can use event_id safely
                 const isAlreadyAnnotating = this._pendingEvents.array.some(pe => {
-                    const r = getRelationFromContent(pe.content);
+                    const r = getRelationFromContent(pe.content as { "m.relates_to": Relation; });
                     return pe.eventType === eventType && r && r.key === relation.key &&
                         (pe.relatedTxnId === relatedTxnId || r.event_id === relation.event_id);
                 });
@@ -225,10 +256,17 @@ export class SendQueue {
                 }
             }
         }
-        await this._enqueueEvent(eventType, content, attachments, relatedTxnId, null, log);
+        await this._enqueueEvent(eventType, content, attachments, relatedTxnId, undefined, log);
     }
 
-    async _enqueueEvent(eventType, content, attachments, relatedTxnId, relatedEventId, log) {
+    async _enqueueEvent(
+        eventType: string,
+        content: EventContent,
+        attachments: Record<string, AttachmentUpload> | null,
+        relatedTxnId: string | undefined,
+        relatedEventId: string | undefined,
+        log: ILogItem | NullLogItem
+    ): Promise<void> {
         const pendingEvent = await this._createAndStoreEvent(eventType, content, relatedTxnId, relatedEventId, attachments);
         this._pendingEvents.set(pendingEvent);
         log.set("queueIndex", pendingEvent.queueIndex);
@@ -241,7 +279,11 @@ export class SendQueue {
         }
     }
 
-    async enqueueRedaction(eventIdOrTxnId, reason, log) {
+    async enqueueRedaction(
+        eventIdOrTxnId: string | null,
+        reason: string | null, // TODO: it can for sure be null, I'm not sure if its string
+        log: ILogItem | NullLogItem
+    ): Promise<void> {
         const isAlreadyRedacting = this._pendingEvents.array.some(pe => {
             return pe.eventType === REDACTION_TYPE &&
                 (pe.relatedTxnId === eventIdOrTxnId || pe.relatedEventId === eventIdOrTxnId);
@@ -286,14 +328,14 @@ export class SendQueue {
         await this._enqueueEvent(REDACTION_TYPE, {reason}, null, relatedTxnId, relatedEventId, log);
     }
 
-    get pendingEvents() {
+    get pendingEvents(): SortedArray<PendingEvent> {
         return this._pendingEvents;
     }
 
-    async _tryUpdateEvent(pendingEvent) {
+    async _tryUpdateEvent(pendingEvent: PendingEvent): Promise<void> {
         const txn = await this._storage.readWriteTxn([this._storage.storeNames.pendingEvents]);
         try {
-            this._tryUpdateEventWithTxn(pendingEvent, txn);
+            void this._tryUpdateEventWithTxn(pendingEvent, txn);
         } catch (err) {
             txn.abort();
             throw err;
@@ -301,7 +343,7 @@ export class SendQueue {
         await txn.complete();
     }
 
-    async _tryUpdateEventWithTxn(pendingEvent, txn) {
+    async _tryUpdateEventWithTxn(pendingEvent: PendingEvent, txn: Transaction): Promise<void> {
         // pendingEvent might have been removed already here
         // by a racing remote echo, so check first so we don't recreate it
         if (await txn.pendingEvents.exists(pendingEvent.roomId, pendingEvent.queueIndex)) {
@@ -309,9 +351,15 @@ export class SendQueue {
         }
     }
 
-    async _createAndStoreEvent(eventType, content, relatedTxnId, relatedEventId, attachments) {
+    async _createAndStoreEvent(
+        eventType: string,
+        content: { body?: string | undefined; reason?: any },
+        relatedTxnId: string | undefined,
+        relatedEventId: string | undefined,
+        attachments: Record<string, AttachmentUpload> | null | undefined
+    ): Promise<PendingEvent> {
         const txn = await this._storage.readWriteTxn([this._storage.storeNames.pendingEvents]);
-        let pendingEvent;
+        let pendingEvent: PendingEvent;
         try {
             const pendingEventsStore = txn.pendingEvents;
             const maxStorageQueueIndex = await pendingEventsStore.getMaxQueueIndex(this._roomId) || 0;
@@ -332,7 +380,8 @@ export class SendQueue {
                 relatedEventId,
                 txnId: makeTxnId(),
                 needsEncryption,
-                needsUpload: !!attachments
+                needsUpload: !!attachments,
+                remoteId: null
             }, attachments);
             pendingEventsStore.add(pendingEvent.data);
         } catch (err) {
@@ -343,25 +392,27 @@ export class SendQueue {
         return pendingEvent;
     }
 
-    dispose() {
+    dispose(): void {
         for (const pe of this._pendingEvents) {
             pe.dispose();
         }
     }
 }
 
-import {HomeServer as MockHomeServer} from "../../../mocks/HomeServer.js";
+import {HomeServer as MockHomeServer} from "../../../mocks/HomeServer";
 import {createMockStorage} from "../../../mocks/Storage";
-import {ListObserver} from "../../../mocks/ListObserver.js";
+import {ListObserver} from "../../../mocks/ListObserver";
 import {NullLogger, NullLogItem} from "../../../logging/NullLogger";
-import {createEvent, withTextBody, withTxnId} from "../../../mocks/event.js";
-import {poll} from "../../../mocks/poll.js";
-import {createAnnotation} from "../timeline/relations.js";
+import {createEvent, withTextBody, withTxnId} from "../../../mocks/event";
+import {poll} from "../../../mocks/poll";
+import {createAnnotation} from "../timeline/relations";
 
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function tests() {
     const logger = new NullLogger();
     return {
-        "enqueue second message when remote echo of first arrives before /send returns": async assert => {
+        "enqueue second message when remote echo of first arrives before /send returns": async (assert): Promise<void> => {
             const storage = await createMockStorage();
             const hs = new MockHomeServer();
             // 1. enqueue and start send event 1
@@ -389,20 +440,20 @@ export function tests() {
             // 5. now expect second send request for event 2
             const sendRequest2 = await poll(() => hs.requests.send[1]);
             sendRequest2.respond({event_id: event2.event_id});
-            await poll(() => !queue._isSending);
+            await poll(() => !queue.isSending);
         },
-        "redaction of pending event that hasn't started sending yet aborts it": async assert => {
+        "redaction of pending event that hasn't started sending yet aborts it": async (assert): Promise<void> => {
             const queue = new SendQueue({
                 roomId: "!abc",
                 storage: await createMockStorage(),
                 hsApi: new MockHomeServer().api
             });
             // first, enqueue a message that will be attempted to send, but we don't respond
-            await queue.enqueueEvent("m.room.message", {body: "hello!"}, null, new NullLogItem());
+            await queue.enqueueEvent("m.room.message", {body: "hello!"}, null, new NullLogItem(new NullLogger()));
 
             const observer = new ListObserver();
             queue.pendingEvents.subscribe(observer);
-            await queue.enqueueEvent("m.room.message", {body: "...world"}, null, new NullLogItem());
+            await queue.enqueueEvent("m.room.message", {body: "...world"}, null, new NullLogItem(new NullLogger()));
             let txnId;
             {
                 const {type, index, value} = await observer.next();
@@ -411,7 +462,7 @@ export function tests() {
                 assert.equal(typeof value.txnId, "string");
                 txnId = value.txnId;
             }
-            await queue.enqueueRedaction(txnId, null, new NullLogItem());
+            await queue.enqueueRedaction(txnId, null, new NullLogItem(new NullLogger()));
             {
                 const {type, value, index} = await observer.next();
                 assert.equal(type, "remove");
@@ -419,32 +470,32 @@ export function tests() {
                 assert.equal(txnId, value.txnId);
             }
         },
-        "duplicate redaction gets dropped": async assert => {
+        "duplicate redaction gets dropped": async (assert): Promise<void> => {
             const queue = new SendQueue({
                 roomId: "!abc",
                 storage: await createMockStorage(),
                 hsApi: new MockHomeServer().api
             });
             assert.equal(queue.pendingEvents.length, 0);
-            await queue.enqueueRedaction("!event", null, new NullLogItem());
+            await queue.enqueueRedaction("!event", null, new NullLogItem(new NullLogger()));
             assert.equal(queue.pendingEvents.length, 1);
-            await queue.enqueueRedaction("!event", null, new NullLogItem());
+            await queue.enqueueRedaction("!event", null, new NullLogItem(new NullLogger()));
             assert.equal(queue.pendingEvents.length, 1);
         },
-        "duplicate reaction gets dropped": async assert => {
+        "duplicate reaction gets dropped": async (assert): Promise<void> => {
             const queue = new SendQueue({
                 roomId: "!abc",
                 storage: await createMockStorage(),
                 hsApi: new MockHomeServer().api
             });
             assert.equal(queue.pendingEvents.length, 0);
-            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "🚀"), null, new NullLogItem());
+            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "🚀"), null, new NullLogItem(new NullLogger()));
             assert.equal(queue.pendingEvents.length, 1);
-            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "👋"), null, new NullLogItem());
+            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "👋"), null, new NullLogItem(new NullLogger()));
             assert.equal(queue.pendingEvents.length, 2);
-            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "🚀"), null, new NullLogItem());
+            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "🚀"), null, new NullLogItem(new NullLogger()));
             assert.equal(queue.pendingEvents.length, 2);
         },
-        
-    }
+
+    };
 }

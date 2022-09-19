@@ -19,7 +19,7 @@ import {OutboundRoomKey} from "./decryption/RoomKey";
 import type {Account} from "../Account";
 import type {KeyLoader} from "./decryption/KeyLoader";
 import type {Olm} from "../olm/Session";
-import type {Transaction} from "../../storage/idb/Transaction.js";
+import type {Transaction} from "../../storage/idb/Transaction";
 import type {RoomKeyMessage} from "../../storage/idb/stores/OperationStore";
 import type {OutboundGroupSession} from "@matrix-org/olm";
 import type {Content} from "../../storage/types";
@@ -206,7 +206,7 @@ export class Encryption {
         const ciphertext = session.encrypt(plaintext);
 
         const encryptedContent = {
-            algorithm: MEGOLM_ALGORITHM,
+            algorithm: MEGOLM_ALGORITHM as typeof MEGOLM_ALGORITHM,
             sender_key: this._account.identityKeys.curve25519,
             ciphertext,
             session_id: session.session_id(),
@@ -257,8 +257,8 @@ type WithheldMessage = {
     session_id: string;
 };
 
-type EncryptedContent = {
-    algorithm: MEGOLM_ALGORITHM;
+export type EncryptedContent = {
+    algorithm: typeof MEGOLM_ALGORITHM;
     sender_key: string;
     ciphertext: string;
     session_id: string;
