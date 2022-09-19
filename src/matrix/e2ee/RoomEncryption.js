@@ -557,7 +557,7 @@ import {Clock as MockClock} from "../../mocks/Clock";
 import {poll} from "../../mocks/poll";
 import {Instance as NullLoggerInstance} from "../../logging/NullLogger";
 import {ConsoleLogger} from "../../logging/ConsoleLogger";
-import {HomeServer as MockHomeServer} from "../../mocks/HomeServer.js";
+import {HomeServer as MockHomeServer} from "../../mocks/HomeServer";
 
 export function tests() {
     const roomId = "!abc:hs.tld";

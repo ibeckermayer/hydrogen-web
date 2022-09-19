@@ -17,7 +17,7 @@ limitations under the License.
 import {ListView} from "../general/ListView";
 import {TemplateView} from "../general/TemplateView";
 import {hydrogenGithubLink} from "./common";
-import {SessionLoadStatusView} from "./SessionLoadStatusView.js";
+import {SessionLoadStatusView} from "./SessionLoadStatusView";
 
 class SessionPickerItemView extends TemplateView {
     _onDeleteClick() {

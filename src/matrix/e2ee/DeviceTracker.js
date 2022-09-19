@@ -16,7 +16,7 @@ limitations under the License.
 
 import {verifyEd25519Signature, SIGNATURE_ALGORITHM} from "./common";
 import {HistoryVisibility, shouldShareKey} from "./common";
-import {RoomMember} from "../room/members/RoomMember.js";
+import {RoomMember} from "../room/members/RoomMember";
 
 const TRACKING_STATUS_OUTDATED = 0;
 const TRACKING_STATUS_UPTODATE = 1;

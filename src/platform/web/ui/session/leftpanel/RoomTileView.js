@@ -16,7 +16,7 @@ limitations under the License.
 */
 
 import {TemplateView} from "../../general/TemplateView";
-import {AvatarView} from "../../AvatarView.js";
+import {AvatarView} from "../../AvatarView";
 import {spinner} from "../../common";
 
 export class RoomTileView extends TemplateView {

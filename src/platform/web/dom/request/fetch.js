@@ -18,10 +18,10 @@ limitations under the License.
 import {
     AbortError,
     ConnectionError
-} from "../../../../matrix/error.js";
+} from "../../../../matrix/error";
 import {abortOnTimeout} from "../../../../utils/timeout";
 import {addCacheBuster, mapAsFormData} from "./common";
-import {xhrRequest} from "./xhr.js";
+import {xhrRequest} from "./xhr";
 
 class RequestResult {
     constructor(promise, controller) {

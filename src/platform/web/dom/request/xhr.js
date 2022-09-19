@@ -17,7 +17,7 @@ limitations under the License.
 import {
     AbortError,
     ConnectionError
-} from "../../../../matrix/error.js";
+} from "../../../../matrix/error";
 import {addCacheBuster, mapAsFormData} from "./common";
 
 class RequestResult {

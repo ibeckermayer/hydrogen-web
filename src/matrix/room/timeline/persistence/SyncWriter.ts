@@ -248,7 +248,14 @@ export class SyncWriter {
     }
 
     /**
+     * @type {SyncWriterResult}
+     * @property {Array<BaseEntry>} entries new timeline entries written
+     * @property {EventKey} newLiveKey the advanced key to write events at
+     *
+     * @param  {Object}  roomResponse [description]
      * @param  {boolean}  isRejoin whether the room was rejoined in the sync being processed
+     * @param  {Transaction}  txn
+     * @return {SyncWriterResult}
      */
     async writeSync(roomResponse: any, isRejoin: boolean, hasFetchedMembers: boolean, txn: Transaction, log: ILogItem): Promise<SyncWriterResult> {
         let {timeline} = roomResponse;
