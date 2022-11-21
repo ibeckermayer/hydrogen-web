@@ -101,7 +101,7 @@ class ReaderRequest {
 
 type Options = {roomId: string, storage: Storage, fragmentIdComparer: FragmentIdComparer};
 
-type DecryptEntriesFn = (entries: EventEntry[], txn: Transaction, log: ILogItem) => DecryptionRequest;
+type DecryptEntriesFn = (entries: EventEntry[], txn: Transaction, log?: ILogItem) => DecryptionRequest;
 
 export class TimelineReader {
     private _roomId: string;
@@ -157,7 +157,7 @@ export class TimelineReader {
         }, log);
     }
 
-    async readById(id: string, log: ILogItem): Promise<EventEntry | undefined> {
+    async readById(id: string, log?: ILogItem): Promise<EventEntry | undefined> {
         let stores = [this._storage.storeNames.timelineEvents];
         if (this._decryptEntries) {
             stores.push(this._storage.storeNames.inboundGroupSessions);

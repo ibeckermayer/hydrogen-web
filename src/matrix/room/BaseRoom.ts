@@ -31,11 +31,70 @@ import {ensureLogItem} from "../../logging/utils";
 import {PowerLevels} from "./PowerLevels";
 import {RetainedObservableValue} from "../../observable/ObservableValue";
 import {TimelineReader} from "./timeline/persistence/TimelineReader";
+import type {Storage} from "../storage/idb/Storage";
+import type {HomeServerApi} from "../net/HomeServerApi";
+import type {MediaRepository} from "../net/MediaRepository";
+import type {Platform, SortedArray} from "../../lib";
+import type {Room} from "./Room";
+import type {RoomEncryption, SummaryData} from "../e2ee/RoomEncryption";
+import type {User} from "../User";
+import type {RoomMember} from "./members/RoomMember";
+import type {Transaction} from "../storage/idb/Transaction";
+import type {ILogItem} from "../../logging/types";
+import type {IncomingRoomKey, RoomKey} from "../e2ee/megolm/decryption/RoomKey";
+import type {FragmentBoundaryEntry} from "./timeline/entries/FragmentBoundaryEntry";
+import { Membership, RoomEventType } from "../net/types/roomEvents";
+import { KeyBackup } from "../e2ee/megolm/keybackup/KeyBackup";
+import { ObservedEvent } from "./ObservedEventMap";
+import { Disposable } from "../../utils/Disposables";
+import { DecryptionPreparation } from "../e2ee/megolm/decryption/DecryptionPreparation";
 
 const EVENT_ENCRYPTED_TYPE = "m.room.encrypted";
 
-export class BaseRoom extends EventEmitter {
-    constructor({roomId, storage, hsApi, mediaRepository, emitCollectionChange, user, createRoomEncryption, getSyncToken, platform}) {
+type Options = {
+    roomId: string;
+    storage: Storage;
+    hsApi: HomeServerApi;
+    mediaRepository: MediaRepository;
+    emitCollectionChange: (room: BaseRoom, params: any) => boolean | undefined;
+    user: User;
+    createRoomEncryption: (room: Room, encryptionParams: {
+        algorithm: "m.megolm.v1.aes-sha2";
+        rotation_period_ms?: number;
+        rotation_period_msgs?: number;
+    }) => RoomEncryption | null;
+    getSyncToken: () => string | undefined;
+    platform: Platform;
+}
+
+export class BaseRoom extends EventEmitter<{change: void}> {
+    private _roomId: string;
+    private _storage: Storage;
+    private _hsApi: HomeServerApi;
+    private _mediaRepository: MediaRepository;
+    private _emitCollectionChange: (room: BaseRoom, params?: any) => boolean | undefined;
+    private _user: User;
+    private _createRoomEncryption: (room: BaseRoom, encryptionParams: {
+        algorithm: "m.megolm.v1.aes-sha2";
+        rotation_period_ms?: number;
+        rotation_period_msgs?: number;
+    }) => RoomEncryption | null;
+    private _getSyncToken: () => string | undefined;
+    private _platform: Platform;
+    private _summary: RoomSummary;
+    private _fragmentIdComparer: FragmentIdComparer;
+    private _timeline?: Timeline;
+    private _changedMembersDuringSync?: Map<string, RoomMember> | null;
+    private _memberList?: MemberList;
+    private _roomEncryption?: RoomEncryption;
+    private _observedEvents?: ObservedEventMap;
+    private _powerLevels?: RetainedObservableValue<PowerLevels>;
+    private _powerLevelLoading?: Promise<PowerLevels>;
+    private _observedMembers?: Map<string, RetainedObservableValue<RoomMember>>;
+    private _heroes?: Heroes;
+
+
+    constructor({roomId, storage, hsApi, mediaRepository, emitCollectionChange, user, createRoomEncryption, getSyncToken, platform}: Options) {
         super();
         this._roomId = roomId;
         this._storage = storage;
@@ -44,22 +103,14 @@ export class BaseRoom extends EventEmitter {
         this._summary = new RoomSummary(roomId);
         this._fragmentIdComparer = new FragmentIdComparer([]);
         this._emitCollectionChange = emitCollectionChange;
-        this._timeline = null;
         this._user = user;
-        this._changedMembersDuringSync = null;
-        this._memberList = null;
         this._createRoomEncryption = createRoomEncryption;
-        this._roomEncryption = null;
         this._getSyncToken = getSyncToken;
         this._platform = platform;
-        this._observedEvents = null;
-        this._powerLevels = null;
-        this._powerLevelLoading = null;
-        this._observedMembers = null;
     }
 
-    async _eventIdsToEntries(eventIds, txn) {
-        const retryEntries = [];
+    async _eventIdsToEntries(eventIds: string[], txn: Transaction): Promise<EventEntry[]> {
+        const retryEntries: EventEntry[] = [];
         await Promise.all(eventIds.map(async eventId => {
             const storageEntry = await txn.timelineEvents.getByEventId(this._roomId, eventId);
             if (storageEntry) {
@@ -69,10 +120,10 @@ export class BaseRoom extends EventEmitter {
         return retryEntries;
     }
 
-    _getAdditionalTimelineRetryEntries(otherRetryEntries, roomKeys) {
-        let retryTimelineEntries = this._roomEncryption.filterUndecryptedEventEntriesForKeys(this._timeline.remoteEntries, roomKeys);
+    _getAdditionalTimelineRetryEntries(otherRetryEntries: EventEntry[] | undefined, roomKeys: RoomKey[]): EventEntry[] {
+        let retryTimelineEntries: Array<EventEntry> = this._roomEncryption.filterUndecryptedEventEntriesForKeys(this._timeline.remoteEntries, roomKeys);
         // filter out any entries already in retryEntries so we don't decrypt them twice
-        const existingIds = otherRetryEntries.reduce((ids, e) => {ids.add(e.id); return ids;}, new Set());
+        const existingIds = otherRetryEntries?.reduce((ids, e) => {ids.add(e.id); return ids;}, new Set());
         retryTimelineEntries = retryTimelineEntries.filter(e => !existingIds.has(e.id));
         return retryTimelineEntries;
     }
@@ -80,11 +131,9 @@ export class BaseRoom extends EventEmitter {
     /**
      * Used for retrying decryption from other sources than sync, like key backup.
      * @internal
-     * @param  {RoomKey} roomKey
      * @param  {Array<string>} eventIds any event ids that should be retried. There might be more in the timeline though for this key.
-     * @return {Promise}
      */
-    async notifyRoomKey(roomKey, eventIds, log) {
+    async notifyRoomKey(roomKey: RoomKey, eventIds: string[], log: ILogItem) {
         if (!this._roomEncryption) {
             return;
         }
@@ -114,7 +163,7 @@ export class BaseRoom extends EventEmitter {
         }
     }
 
-    _setEncryption(roomEncryption) {
+    _setEncryption(roomEncryption: RoomEncryption): boolean {
         if (roomEncryption && !this._roomEncryption) {
             this._roomEncryption = roomEncryption;
             if (this._timeline) {
@@ -129,7 +178,7 @@ export class BaseRoom extends EventEmitter {
      * Used for decrypting when loading/filling the timeline, and retrying decryption,
      * not during sync, where it is split up during the multiple phases.
      */
-    _decryptEntries(source, entries, inboundSessionTxn, log = null) {
+    _decryptEntries(source: "Sync" | "Timeline" | "Retry", entries: EventEntry[], inboundSessionTxn?: Transaction, log?: ILogItem): DecryptionRequest {
         const request = new DecryptionRequest(async (r, log) => {
             if (!inboundSessionTxn) {
                 inboundSessionTxn = await this._storage.readTxn([this._storage.storeNames.inboundGroupSessions]);
@@ -140,8 +189,8 @@ export class BaseRoom extends EventEmitter {
             }).map(entry => entry.event);
             r.preparation = await this._roomEncryption.prepareDecryptAll(events, null, source, inboundSessionTxn);
             if (r.cancelled) return;
-            const changes = await r.preparation.decrypt();
-            r.preparation = null;
+            const changes = await r.preparation?.decrypt();
+            r.preparation = undefined;
             if (r.cancelled) return;
             const stores = [this._storage.storeNames.groupSessionDecryptions];
             const isTimelineOpen = this._isTimelineOpen;
@@ -152,7 +201,7 @@ export class BaseRoom extends EventEmitter {
             const writeTxn = await this._storage.readWriteTxn(stores);
             let decryption;
             try {
-                decryption = await changes.write(writeTxn, log);
+                decryption = await changes?.write(writeTxn);
                 if (isTimelineOpen) {
                     await decryption.verifyKnownSenders(writeTxn);
                 }
@@ -170,7 +219,7 @@ export class BaseRoom extends EventEmitter {
                 // verify missing senders async and update timeline once done so we don't delay rendering with network requests
                 log.wrapDetached("fetch unknown senders keys", async log => {
                     const newlyVerifiedDecryption = await decryption.fetchAndVerifyRemainingSenders(this._hsApi, log);
-                    const verifiedEntries = [];
+                    const verifiedEntries: any[] = [];
                     newlyVerifiedDecryption.applyToEntries(entries, entry => verifiedEntries.push(entry));
                     this._timeline?.replaceEntries(verifiedEntries);
                     this._observedEvents?.updateEvents(verifiedEntries);
@@ -181,14 +230,14 @@ export class BaseRoom extends EventEmitter {
     }
 
     // TODO: move this to Room
-    async _getSyncRetryDecryptEntries(newKeys, roomEncryption, txn) {
-        const entriesPerKey = await Promise.all(newKeys.map(async key => {
+    async _getSyncRetryDecryptEntries(newKeys: IncomingRoomKey[], roomEncryption: RoomEncryption, txn: Transaction): Promise<EventEntry[] | undefined> {
+        const entriesPerKey: (EventEntry[] | undefined)[] = await Promise.all(newKeys.map(async key => {
             const retryEventIds = await roomEncryption.getEventIdsForMissingKey(key, txn);
             if (retryEventIds) {
                 return this._eventIdsToEntries(retryEventIds, txn);
             }
         }));
-        let retryEntries = entriesPerKey.reduce((allEntries, entries) => entries ? allEntries.concat(entries) : allEntries, []);
+        let retryEntries = entriesPerKey.reduce((allEntries, entries) => entries ? allEntries?.concat(entries) : allEntries, []);
         // If we have the timeline open, see if there are more entries for the new keys
         // as we only store missing session information for synced events, not backfilled.
         // We want to decrypt all events we can though if the user is looking
@@ -198,14 +247,14 @@ export class BaseRoom extends EventEmitter {
             // make copies so we don't modify the original entry in writeSync, before the afterSync stage
             const retryTimelineEntriesCopies = retryTimelineEntries.map(e => e.clone());
             // add to other retry entries
-            retryEntries = retryEntries.concat(retryTimelineEntriesCopies);
+            retryEntries = retryEntries?.concat(retryTimelineEntriesCopies);
         }
         return retryEntries;
     }
 
     /** @package */
-    async load(summary, txn, log) {
-        log.set("id", this.id);
+    async load(summary: SummaryData | undefined, txn: Transaction, log?: ILogItem) {
+        log?.set("id", this.id);
         try {
             // if called from sync, there is no summary yet
             if (summary) {
@@ -218,7 +267,7 @@ export class BaseRoom extends EventEmitter {
             // need to load members for name?
             if (this._summary.data.needsHeroes) {
                 this._heroes = new Heroes(this._roomId);
-                const changes = await this._heroes.calculateChanges(this._summary.data.heroes, [], txn);
+                const changes = await this._heroes.calculateChanges(this._summary.data.heroes, new Map(), txn);
                 this._heroes.applyChanges(changes, this._summary.data, log);
             }
         } catch (err) {
@@ -226,7 +275,7 @@ export class BaseRoom extends EventEmitter {
         }
     }
 
-    async observeMember(userId) {
+    async observeMember(userId: string): Promise<RetainedObservableValue<RoomMember> | null> {
         if (!this._observedMembers) {
             this._observedMembers = new Map();
         }
@@ -246,19 +295,21 @@ export class BaseRoom extends EventEmitter {
         if (!member) {
             return null;
         }
-        const observableMember = new RetainedObservableValue(member, () => this._observedMembers.delete(userId));
+        const observableMember = new RetainedObservableValue(member, () => this._observedMembers?.delete(userId));
         this._observedMembers.set(userId, observableMember);
         return observableMember;
     }
 
 
     /** @public */
-    async loadMemberList(txn = undefined, log = null) {
+    async loadMemberList(txn?: Transaction, log?: ILogItem) {
         if (this._memberList) {
             // TODO: also await fetchOrLoadMembers promise here
             this._memberList.retain();
             return this._memberList;
         } else {
+            const syncToken = this._getSyncToken();
+            if (!txn || !syncToken) throw new Error("missing transaction or sync token")
             const members = await fetchOrLoadMembers({
                 summary: this._summary,
                 roomId: this._roomId,
@@ -267,21 +318,21 @@ export class BaseRoom extends EventEmitter {
                 // pass in a transaction if we know we won't need to fetch (which would abort the transaction)
                 // and we want to make this operation part of the larger transaction
                 txn,
-                syncToken: this._getSyncToken(),
+                syncToken: syncToken,
                 // to handle race between /members and /sync
                 setChangedMembersMap: map => this._changedMembersDuringSync = map,
                 log,
             }, this._platform.logger);
             this._memberList = new MemberList({
                 members,
-                closeCallback: () => { this._memberList = null; }
+                closeCallback: () => { this._memberList = undefined; }
             });
             return this._memberList;
         }
     }
 
     /** @public */
-    fillGap(fragmentEntry, amount, log = null) {
+    fillGap(fragmentEntry: FragmentBoundaryEntry, amount: number, log?: ILogItem) {
         // TODO move some/all of this out of BaseRoom
         return this._platform.logger.wrapOrRun(log, "fillGap", async log => {
             log.set("id", this.id);
@@ -331,7 +382,7 @@ export class BaseRoom extends EventEmitter {
             }
             await txn.complete();
             if (this._roomEncryption) {
-                const decryptRequest = this._decryptEntries(DecryptionSource.Timeline, gapResult.entries, null, log);
+                const decryptRequest = this._decryptEntries(DecryptionSource.Timeline, gapResult.entries, undefined, log);
                 await decryptRequest.complete();
             }
             // once txn is committed, update in-memory state & emit events
@@ -339,7 +390,7 @@ export class BaseRoom extends EventEmitter {
                 this._fragmentIdComparer.add(fragment);
             }
             if (extraGapFillChanges) {
-                this._applyGapFill(extraGapFillChanges);
+                this._applyGapFill();
             }
             if (this._timeline) {
                 // these should not be added if not already there
@@ -358,7 +409,7 @@ export class BaseRoom extends EventEmitter {
     _applyGapFill() {}
 
     /** @public */
-    get name() {
+    get name(): string | undefined{
         if (this._heroes) {
             return this._heroes.roomName;
         }
@@ -369,21 +420,19 @@ export class BaseRoom extends EventEmitter {
         if (summaryData.canonicalAlias) {
             return summaryData.canonicalAlias;
         }
-        return null;
     }
 
     /** @public */
-    get id() {
+    get id(): string {
         return this._roomId;
     }
 
-    get avatarUrl() {
+    get avatarUrl(): string | undefined{
         if (this._summary.data.avatarUrl) {
             return this._summary.data.avatarUrl;
         } else if (this._heroes) {
             return this._heroes.roomAvatarUrl;
         }
-        return null;
     }
 
     /**
@@ -392,48 +441,48 @@ export class BaseRoom extends EventEmitter {
      * ID, but DM rooms should be the same color as their
      * user's avatar.
      */
-    get avatarColorId() {
+    get avatarColorId(): string {
         return this._roomId;
     }
 
-    get lastMessageTimestamp() {
+    get lastMessageTimestamp(): number {
         return this._summary.data.lastMessageTimestamp;
     }
 
-    get isLowPriority() {
+    get isLowPriority(): boolean {
         const tags = this._summary.data.tags;
         return !!(tags && tags['m.lowpriority']);
     }
 
-    get isEncrypted() {
+    get isEncrypted(): boolean {
         return !!this._summary.data.encryption;
     }
 
-    get isJoined() {
+    get isJoined(): boolean {
         return this.membership === "join";
     }
 
-    get isLeft() {
+    get isLeft(): boolean {
         return this.membership === "leave";
     }
 
-    get canonicalAlias() {
+    get canonicalAlias(): string | undefined{
         return this._summary.data.canonicalAlias;
     }
 
-    get joinedMemberCount() {
+    get joinedMemberCount(): number {
         return this._summary.data.joinCount;
     }
 
-    get mediaRepository() {
+    get mediaRepository(): MediaRepository {
         return this._mediaRepository;
     }
 
-    get membership() {
+    get membership(): Membership {
         return this._summary.data.membership;
     }
 
-    isDirectMessageForUserId(userId) {
+    isDirectMessageForUserId(userId: string): boolean {
         if (this._summary.data.dmUserId === userId) {
             return true;
         } else {
@@ -448,9 +497,9 @@ export class BaseRoom extends EventEmitter {
         return false;
     }
 
-    async _loadPowerLevels() {
+    async _loadPowerLevels(): Promise<PowerLevels> {
         const txn = await this._storage.readTxn([this._storage.storeNames.roomState]);
-        const powerLevelsState = await txn.roomState.get(this._roomId, "m.room.power_levels", "");
+        const powerLevelsState = await txn.roomState.get(this._roomId, RoomEventType.PowerLevels, "");
         if (powerLevelsState) {
             return new PowerLevels({
                 powerLevelEvent: powerLevelsState.event,
@@ -458,7 +507,7 @@ export class BaseRoom extends EventEmitter {
                 membership: this.membership
             });
         }
-        const createState = await txn.roomState.get(this._roomId, "m.room.create", "");
+        const createState = await txn.roomState.get(this._roomId, RoomEventType.Create, "");
         if (createState) {
             return new PowerLevels({
                 createEvent: createState.event,
@@ -474,22 +523,21 @@ export class BaseRoom extends EventEmitter {
     /**
      * Get the PowerLevels of the room.
      * Always subscribe to the value returned by this method.
-     * @returns {RetainedObservableValue} PowerLevels of the room
      */
-    async observePowerLevels() {
+    async observePowerLevels(): Promise<RetainedObservableValue<PowerLevels>> {
         if (this._powerLevelLoading) { await this._powerLevelLoading; }
         let observable = this._powerLevels;
         if (!observable) {
             this._powerLevelLoading = this._loadPowerLevels();
             const powerLevels = await this._powerLevelLoading;
-            observable = new RetainedObservableValue(powerLevels, () => { this._powerLevels = null; });
+            observable = new RetainedObservableValue(powerLevels, () => { this._powerLevels = undefined; });
             this._powerLevels = observable;
-            this._powerLevelLoading = null;
+            this._powerLevelLoading = undefined;
         }
         return observable;
     }
 
-    enableKeyBackup(keyBackup) {
+    enableKeyBackup(keyBackup: KeyBackup | undefined) {
         this._roomEncryption?.enableKeyBackup(keyBackup);
         // TODO: do we really want to do this every time you open the app?
         if (this._timeline && keyBackup) {
@@ -511,7 +559,7 @@ export class BaseRoom extends EventEmitter {
     }
 
     /** @public */
-    openTimeline(log = null) {
+    openTimeline(log?: ILogItem) {
         return this._platform.logger.wrapOrRun(log, "open timeline", async log => {
             log.set("id", this.id);
             if (this._timeline) {
@@ -523,7 +571,7 @@ export class BaseRoom extends EventEmitter {
                 fragmentIdComparer: this._fragmentIdComparer,
                 pendingEvents: this._getPendingEvents(),
                 closeCallback: () => {
-                    this._timeline = null;
+                    this._timeline = undefined;
                     if (this._roomEncryption) {
                         this._roomEncryption.notifyTimelineClosed();
                     }
@@ -548,9 +596,9 @@ export class BaseRoom extends EventEmitter {
     }
 
     /* allow subclasses to provide an observable list with pending events when opening the timeline */
-    _getPendingEvents() { return null; }
+    _getPendingEvents(): null { return null; }
 
-    observeEvent(eventId) {
+    observeEvent(eventId: string): ObservedEvent {
         if (!this._observedEvents) {
             this._observedEvents = new ObservedEventMap(() => {
                 this._observedEvents = null;
@@ -572,7 +620,7 @@ export class BaseRoom extends EventEmitter {
         return observable;
     }
 
-    async _readEventById(eventId) {
+    async _readEventById(eventId: string): Promise<EventEntry | undefined> {
         const reader = new TimelineReader({ roomId: this._roomId, storage: this._storage, fragmentIdComparer: this._fragmentIdComparer });
         const entry = await reader.readById(eventId);
         return entry;
@@ -585,9 +633,12 @@ export class BaseRoom extends EventEmitter {
 }
 
 export class DecryptionRequest {
-    constructor(decryptFn, log) {
+    private _cancelled: boolean;
+    preparation?: DecryptionPreparation;
+    private _promise: Promise<void>;
+
+    constructor(decryptFn: (r: DecryptionRequest, log: ILogItem) => Promise<void>, log: ILogItem) {
         this._cancelled = false;
-        this.preparation = null;
         this._promise = log.wrap("decryptEntries", log => decryptFn(this, log));
     }
 

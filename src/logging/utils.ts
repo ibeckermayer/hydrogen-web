@@ -13,6 +13,6 @@ export function wrapOrRunNullLogger<T>(logItem: ILogItem | undefined, labelOrVal
     }
 }
 
-export function ensureLogItem(logItem: ILogItem): ILogItem {
+export function ensureLogItem(logItem?: ILogItem): ILogItem {
     return logItem || NullLoggerInstance.item;
 }

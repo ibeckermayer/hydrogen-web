@@ -21,11 +21,11 @@ import type {MemberChange, RoomMember} from "./RoomMember";
 export class MemberList extends RetainedValue {
     private _members: ObservableMap<string, RoomMember>;
 
-    constructor({members, closeCallback}: {members: RoomMember[], closeCallback: VoidFunction}) {
+    constructor({members, closeCallback}: {members: (RoomMember | undefined)[], closeCallback: VoidFunction}) {
         super(closeCallback);
         this._members = new ObservableMap<string, RoomMember>();
         for (const member of members) {
-            this._members.add(member.userId, member);
+            if (member) this._members.add(member.userId, member);
         }
     }
 
