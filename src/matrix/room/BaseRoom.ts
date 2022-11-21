@@ -31,10 +31,11 @@ import {ensureLogItem} from "../../logging/utils";
 import {PowerLevels} from "./PowerLevels";
 import {RetainedObservableValue} from "../../observable/ObservableValue";
 import {TimelineReader} from "./timeline/persistence/TimelineReader";
+import {Platform, SortedArray} from "../../lib";
+import {Membership, RoomEventType} from "../net/types/roomEvents";
 import type {Storage} from "../storage/idb/Storage";
 import type {HomeServerApi} from "../net/HomeServerApi";
 import type {MediaRepository} from "../net/MediaRepository";
-import type {Platform, SortedArray} from "../../lib";
 import type {Room} from "./Room";
 import type {RoomEncryption, SummaryData} from "../e2ee/RoomEncryption";
 import type {User} from "../User";
@@ -43,15 +44,14 @@ import type {Transaction} from "../storage/idb/Transaction";
 import type {ILogItem} from "../../logging/types";
 import type {IncomingRoomKey, RoomKey} from "../e2ee/megolm/decryption/RoomKey";
 import type {FragmentBoundaryEntry} from "./timeline/entries/FragmentBoundaryEntry";
-import { Membership, RoomEventType } from "../net/types/roomEvents";
-import { KeyBackup } from "../e2ee/megolm/keybackup/KeyBackup";
-import { ObservedEvent } from "./ObservedEventMap";
-import { Disposable } from "../../utils/Disposables";
-import { DecryptionPreparation } from "../e2ee/megolm/decryption/DecryptionPreparation";
+import type {KeyBackup} from "../e2ee/megolm/keybackup/KeyBackup";
+import type {ObservedEvent} from "./ObservedEventMap";
+import type {DecryptionPreparation} from "../e2ee/megolm/decryption/DecryptionPreparation";
+import type {PendingEvent} from "./sending/PendingEvent";
 
 const EVENT_ENCRYPTED_TYPE = "m.room.encrypted";
 
-type Options = {
+export type Options = {
     roomId: string;
     storage: Storage;
     hsApi: HomeServerApi;
@@ -68,30 +68,30 @@ type Options = {
 }
 
 export class BaseRoom extends EventEmitter<{change: void}> {
-    private _roomId: string;
-    private _storage: Storage;
-    private _hsApi: HomeServerApi;
+    protected _roomId: string;
+    protected _storage: Storage;
+    protected _hsApi: HomeServerApi;
     private _mediaRepository: MediaRepository;
     private _emitCollectionChange: (room: BaseRoom, params?: any) => boolean | undefined;
-    private _user: User;
-    private _createRoomEncryption: (room: BaseRoom, encryptionParams: {
+    protected _user: User;
+    protected _createRoomEncryption: (room: BaseRoom, encryptionParams: {
         algorithm: "m.megolm.v1.aes-sha2";
         rotation_period_ms?: number;
         rotation_period_msgs?: number;
     }) => RoomEncryption | null;
     private _getSyncToken: () => string | undefined;
-    private _platform: Platform;
-    private _summary: RoomSummary;
-    private _fragmentIdComparer: FragmentIdComparer;
-    private _timeline?: Timeline;
-    private _changedMembersDuringSync?: Map<string, RoomMember> | null;
-    private _memberList?: MemberList;
-    private _roomEncryption?: RoomEncryption;
-    private _observedEvents?: ObservedEventMap;
-    private _powerLevels?: RetainedObservableValue<PowerLevels>;
+    protected _platform: Platform;
+    protected _summary: RoomSummary;
+    protected _fragmentIdComparer: FragmentIdComparer;
+    protected _timeline?: Timeline;
+    protected _changedMembersDuringSync?: Map<string, RoomMember> | null;
+    protected _memberList?: MemberList;
+    protected _roomEncryption?: RoomEncryption;
+    protected _observedEvents?: ObservedEventMap;
+    protected _powerLevels?: RetainedObservableValue<PowerLevels>;
     private _powerLevelLoading?: Promise<PowerLevels>;
-    private _observedMembers?: Map<string, RetainedObservableValue<RoomMember>>;
-    private _heroes?: Heroes;
+    protected _observedMembers?: Map<string, RetainedObservableValue<RoomMember>>;
+    protected _heroes?: Heroes;
 
 
     constructor({roomId, storage, hsApi, mediaRepository, emitCollectionChange, user, createRoomEncryption, getSyncToken, platform}: Options) {
@@ -178,7 +178,7 @@ export class BaseRoom extends EventEmitter<{change: void}> {
      * Used for decrypting when loading/filling the timeline, and retrying decryption,
      * not during sync, where it is split up during the multiple phases.
      */
-    _decryptEntries(source: "Sync" | "Timeline" | "Retry", entries: EventEntry[], inboundSessionTxn?: Transaction, log?: ILogItem): DecryptionRequest {
+    _decryptEntries(source: "Sync" | "Timeline" | "Retry", entries: EventEntry[], inboundSessionTxn: Transaction | undefined, log: ILogItem): DecryptionRequest {
         const request = new DecryptionRequest(async (r, log) => {
             if (!inboundSessionTxn) {
                 inboundSessionTxn = await this._storage.readTxn([this._storage.storeNames.inboundGroupSessions]);
@@ -253,7 +253,7 @@ export class BaseRoom extends EventEmitter<{change: void}> {
     }
 
     /** @package */
-    async load(summary: SummaryData | undefined, txn: Transaction, log?: ILogItem) {
+    async load(summary: SummaryData | undefined, txn: Transaction, log: ILogItem) {
         log?.set("id", this.id);
         try {
             // if called from sync, there is no summary yet
@@ -332,7 +332,7 @@ export class BaseRoom extends EventEmitter<{change: void}> {
     }
 
     /** @public */
-    fillGap(fragmentEntry: FragmentBoundaryEntry, amount: number, log?: ILogItem) {
+    fillGap(fragmentEntry: FragmentBoundaryEntry, amount: number, log: ILogItem) {
         // TODO move some/all of this out of BaseRoom
         return this._platform.logger.wrapOrRun(log, "fillGap", async log => {
             log.set("id", this.id);
@@ -405,11 +405,13 @@ export class BaseRoom extends EventEmitter<{change: void}> {
     JoinedRoom uses this update remote echos.
     */
     // eslint-disable-next-line no-unused-vars
-    async _writeGapFill(chunk, txn, log) {}
-    _applyGapFill() {}
+    async _writeGapFill(chunk, txn, log): Promise<PendingEvent[]> {
+        return []
+    }
+    _applyGapFill(removedPendingEvents?: PendingEvent[]) {}
 
     /** @public */
-    get name(): string | undefined{
+    get name(): string | undefined {
         if (this._heroes) {
             return this._heroes.roomName;
         }
@@ -481,6 +483,14 @@ export class BaseRoom extends EventEmitter<{change: void}> {
     get membership(): Membership {
         return this._summary.data.membership;
     }
+
+    get isArchived(): boolean {
+        return false
+    }
+
+    release(): void {}
+    forget(): void {}
+    join(): void {}
 
     isDirectMessageForUserId(userId: string): boolean {
         if (this._summary.data.dmUserId === userId) {
@@ -596,7 +606,7 @@ export class BaseRoom extends EventEmitter<{change: void}> {
     }
 
     /* allow subclasses to provide an observable list with pending events when opening the timeline */
-    _getPendingEvents(): null { return null; }
+    _getPendingEvents(): SortedArray<PendingEvent> { return new SortedArray(() => 0); }
 
     observeEvent(eventId: string): ObservedEvent {
         if (!this._observedEvents) {

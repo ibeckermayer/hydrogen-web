@@ -77,7 +77,7 @@ export class MemberDetailsViewModel extends ViewModel {
         this.emitChange("role");
     }
 
-    get avatarLetter(): string {
+    get avatarLetter(): string | undefined {
         return avatarInitials(this.name);
     }
 

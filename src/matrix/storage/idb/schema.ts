@@ -265,6 +265,6 @@ async function migrateBackupStatus(db: IDBDatabase, txn: IDBTransaction, localSt
         }
         return NOT_DONE;
     });
-    log.set("countWithoutSession", countWithoutSession);
-    log.set("countWithSession", countWithSession);
+    log?.set("countWithoutSession", countWithoutSession);
+    log?.set("countWithSession", countWithSession);
 }

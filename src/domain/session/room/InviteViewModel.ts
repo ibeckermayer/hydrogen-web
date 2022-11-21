@@ -68,7 +68,7 @@ export class InviteViewModel extends ViewModel implements IGridItemViewModel {
         return "";
     }
 
-    get avatarLetter(): string {
+    get avatarLetter(): string | undefined {
         return avatarInitials(this.name);
     }
 
@@ -151,7 +151,7 @@ class RoomMemberViewModel {
         return this._member.name;
     }
 
-    get avatarLetter(): string {
+    get avatarLetter(): string | undefined {
         return avatarInitials(this.name);
     }
 

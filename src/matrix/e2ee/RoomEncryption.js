@@ -536,7 +536,7 @@ class DecryptionPreparation {
     }
 }
 
-class DecryptionChanges {
+export class DecryptionChanges {
     constructor(megolmDecryptionChanges, extraErrors, source, roomEncryption, events) {
         this._megolmDecryptionChanges = megolmDecryptionChanges;
         this._extraErrors = extraErrors;
@@ -553,7 +553,7 @@ class DecryptionChanges {
     }
 }
 
-class BatchDecryptionResult {
+export class BatchDecryptionResult {
     constructor(results, errors, roomEncryption) {
         this.results = results;
         this.errors = errors;

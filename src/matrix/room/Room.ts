@@ -24,11 +24,33 @@ import {Heroes} from "./members/Heroes";
 import {AttachmentUpload} from "./AttachmentUpload";
 import {DecryptionSource} from "../e2ee/common";
 import {PowerLevels} from "./PowerLevels";
-import {RoomEventType} from "../net/types/roomEvents";
+import {HistoryVisibility, PowerLevelsStateEvent, RoomEventType} from "../net/types/roomEvents";
+import type {Options as BaseRoomOptions} from './BaseRoom';
+import type {PendingEvent, PendingEventData} from "./sending/PendingEvent";
+import type {SortedArray} from "../../observable";
+import type {RoomEncryption, SummaryData, DecryptionPreparation, BatchDecryptionResult} from "../e2ee/RoomEncryption";
+import type {EventEntry} from "./timeline/entries/EventEntry";
+import type {EventKey} from "./timeline/EventKey";
+import type {MemberChange} from "./members/RoomMember";
+import type {HeroChanges} from "./members/Heroes";
+import { ILogItem } from "../../logging/types";
+import { JoinedRoom, LeftRoom } from "../net/types/sync";
+import { Transaction } from "../storage/idb/Transaction";
+import { IncomingRoomKey } from "../e2ee/megolm/decryption/RoomKey";
+import { DecryptionChanges } from "../e2ee/megolm/decryption/DecryptionChanges";
+import { Operation } from "../storage/idb/stores/OperationStore";
+import { TimelineEvent, Content } from "../storage/types";
 
+
+type Options = {
+    pendingEvents?: PendingEventData[];
+} & BaseRoomOptions;
 
 export class Room extends BaseRoom {
-    constructor(options) {
+    private _syncWriter: SyncWriter;
+    private _sendQueue: SendQueue;
+
+    constructor(options: Options) {
         super(options);
         // TODO: pass pendingEvents to start like pendingOperations?
         const {pendingEvents} = options;
@@ -46,7 +68,7 @@ export class Room extends BaseRoom {
         this._sendQueue = new SendQueue({roomId: this.id, storage: this._storage, hsApi: this._hsApi, pendingEvents});
     }
 
-    _setEncryption(roomEncryption) {
+    _setEncryption(roomEncryption: RoomEncryption): boolean {
         if (super._setEncryption(roomEncryption)) {
             this._sendQueue.enableEncryption(this._roomEncryption);
             return true;
@@ -54,19 +76,16 @@ export class Room extends BaseRoom {
         return false;
     }
 
-    /**
-     * @return {RoomSyncPreparation} (find the type in Sync.ts)
-     */
-    async prepareSync(roomResponse, membership, newKeys, txn, log) {
-        log.set("id", this.id);
+    async prepareSync(roomResponse: JoinedRoom | LeftRoom, membership: string, newKeys: IncomingRoomKey[], txn: Transaction, log: ILogItem): Promise<RoomSyncPreparation> {
+        log?.set("id", this.id);
         if (newKeys) {
-            log.set("newKeys", newKeys.length);
+            log?.set("newKeys", newKeys.length);
         }
         let summaryChanges = this._summary.data.applySyncResponse(roomResponse, membership, this._user.id);
         let roomEncryption = this._roomEncryption;
         // encryption is enabled in this sync
         if (!roomEncryption && summaryChanges.encryption) {
-            log.set("enableEncryption", true);
+            log?.set("enableEncryption", true);
             roomEncryption = this._createRoomEncryption(this, summaryChanges.encryption);
         }
 
@@ -82,7 +101,7 @@ export class Room extends BaseRoom {
                 // in this sync at all.
                 retryEntries = await this._getSyncRetryDecryptEntries(newKeys, roomEncryption, txn);
                 if (retryEntries.length) {
-                    log.set("retry", retryEntries.length);
+                    log?.set("retry", retryEntries.length);
                     eventsToDecrypt = eventsToDecrypt.concat(retryEntries.map(entry => entry.event));
                 }
             }
@@ -99,13 +118,12 @@ export class Room extends BaseRoom {
             roomEncryption,
             summaryChanges,
             decryptPreparation,
-            decryptChanges: null,
             retryEntries
         };
     }
 
-    async afterPrepareSync(preparation, parentLog) {
-        if (preparation.decryptPreparation) {
+    async afterPrepareSync(preparation: RoomSyncPreparation | undefined, parentLog: ILogItem) {
+        if (preparation?.decryptPreparation) {
             await parentLog.wrap("decrypt", async log => {
                 log.set("id", this.id);
                 preparation.decryptChanges = await preparation.decryptPreparation.decrypt();
@@ -116,10 +134,19 @@ export class Room extends BaseRoom {
 
     /**
      * @package
-     * @arg3 {RoomSyncPreparation} (find it in Sync.ts)
-     * @return {RoomWriteSyncChanges} (find it in Sync.ts)
      */
-    async writeSync(roomResponse, isInitialSync, {summaryChanges, decryptChanges, roomEncryption, retryEntries}, txn, log) {
+     async writeSync(
+        roomResponse: LeftRoom,
+        isInitialSync: boolean,
+        {
+            summaryChanges,
+            decryptChanges,
+            roomEncryption,
+            retryEntries,
+        }: RoomSyncPreparation,
+        txn: Transaction,
+        log: ILogItem
+    ): Promise<RoomWriteSyncChanges> {
         log.set("id", this.id);
         const isRejoin = summaryChanges.isNewJoin(this._summary.data);
         if (isRejoin) {
@@ -130,12 +157,12 @@ export class Room extends BaseRoom {
         }
         const {entries: newEntries, updatedEntries, newLiveKey, memberChanges} =
             await log.wrap("syncWriter", log => this._syncWriter.writeSync(
-                roomResponse, isRejoin, summaryChanges.hasFetchedMembers, txn, log), log.level.Detail);
-        let decryption;
+                roomResponse, isRejoin, summaryChanges.hasFetchedMembers, txn, log), log?.level.Detail);
+        let decryption: BatchDecryptionResult | undefined;
         if (decryptChanges) {
-            decryption = await log.wrap("decryptChanges", log => decryptChanges.write(txn, log));
-            log.set("decryptionResults", decryption.results.size);
-            log.set("decryptionErrors", decryption.errors.size);
+            decryption = await log?.wrap("decryptChanges", () => decryptChanges.write(txn));
+            log?.set("decryptionResults", decryption.results.size);
+            log?.set("decryptionErrors", decryption.errors.size);
             if (this._isTimelineOpen) {
                 await decryption.verifyKnownSenders(txn);
             }
@@ -170,7 +197,7 @@ export class Room extends BaseRoom {
         }
         // fetch new members while we have txn open,
         // but don't make any in-memory changes yet
-        let heroChanges;
+        let heroChanges: HeroChanges | undefined;
         // if any hero changes their display name, the summary in the room response
         // is also updated, which will trigger a RoomSummary update
         // and make summaryChanges non-falsy here
@@ -181,9 +208,9 @@ export class Room extends BaseRoom {
             }
             heroChanges = await this._heroes.calculateChanges(summaryChanges.heroes, memberChanges, txn);
         }
-        let removedPendingEvents;
+        let removedPendingEvents: PendingEvent[] | undefined;
         if (Array.isArray(roomResponse.timeline?.events)) {
-            removedPendingEvents = await this._sendQueue.removeRemoteEchos(roomResponse.timeline.events, txn, log);
+            removedPendingEvents = await this._sendQueue.removeRemoteEchos(roomResponse.timeline!.events, txn, log);
         }
         const powerLevelsEvent = this._getPowerLevelsEvent(roomResponse);
         return {
@@ -206,13 +233,13 @@ export class Room extends BaseRoom {
      * Called with the changes returned from `writeSync` to apply them and emit changes.
      * No storage or network operations should be done here.
      */
-    afterSync(changes, log) {
+    afterSync(changes: RoomWriteSyncChanges, log: ILogItem) {
         const {
             summaryChanges, newEntries, updatedEntries, newLiveKey,
             removedPendingEvents, memberChanges, powerLevelsEvent,
             heroChanges, roomEncryption, encryptionChanges
         } = changes;
-        log.set("id", this.id);
+        log?.set("id", this.id);
         this._syncWriter.afterSync(newLiveKey);
         this._setEncryption(roomEncryption);
         if (this._roomEncryption) {
@@ -243,7 +270,7 @@ export class Room extends BaseRoom {
         if (summaryChanges) {
             this._summary.applyChanges(summaryChanges);
             if (!this._summary.data.needsHeroes) {
-                this._heroes = null;
+                this._heroes = undefined;
             }
             emitChange = true;
         }
@@ -274,22 +301,22 @@ export class Room extends BaseRoom {
         }
     }
 
-    _updateObservedMembers(memberChanges) {
+    _updateObservedMembers(memberChanges: Map<string, MemberChange>) {
         for (const [userId, memberChange] of memberChanges) {
-            const observableMember = this._observedMembers.get(userId);
+            const observableMember = this._observedMembers?.get(userId);
             if (observableMember) {
                 observableMember.set(memberChange.member);
             }
         }
     }
 
-    _getPowerLevelsEvent(roomResponse) {
+    _getPowerLevelsEvent(roomResponse: LeftRoom): PowerLevelsStateEvent | undefined {
         const isPowerlevelEvent = event => event.state_key === "" && event.type === RoomEventType.PowerLevels;
-        const powerLevelEvent = roomResponse.timeline?.events.find(isPowerlevelEvent) ?? roomResponse.state?.events.find(isPowerlevelEvent);
-        return powerLevelEvent;
+        const powerLevelEvent = roomResponse.timeline?.events?.find(isPowerlevelEvent) ?? roomResponse.state?.events.find(isPowerlevelEvent);
+        return powerLevelEvent as PowerLevelsStateEvent;
     }
 
-    _updatePowerLevels(powerLevelEvent) {
+    _updatePowerLevels(powerLevelEvent: PowerLevelsStateEvent) {
         if (this._powerLevels) {
             const newPowerLevels = new PowerLevels({
                 powerLevelEvent,
@@ -305,20 +332,20 @@ export class Room extends BaseRoom {
      * Can be used to do longer running operations that resulted from the last sync,
      * like network operations.
      */
-    async afterSyncCompleted({encryptionChanges, decryption, newEntries, updatedEntries}, log) {
+    async afterSyncCompleted({encryptionChanges, decryption, newEntries, updatedEntries}: RoomWriteSyncChanges, log: ILogItem) {
         const shouldFlushKeys = encryptionChanges?.shouldFlush;
         const shouldFetchUnverifiedSenders = this._isTimelineOpen && decryption?.hasUnverifiedSenders;
         // only log rooms where we actually do something
         if (shouldFlushKeys || shouldFetchUnverifiedSenders) {
-            await log.wrap({l: "room", id: this.id}, async log => {
-                const promises = [];
+            await log?.wrap({l: "room", id: this.id}, async log => {
+                const promises: Promise<void>[] = [];
                 if (shouldFlushKeys) {
                     promises.push(this._roomEncryption.flushPendingRoomKeyShares(this._hsApi, null, log));
                 }
                 if (shouldFetchUnverifiedSenders) {
                     const promise = log.wrap("verify senders", (async log => {
-                        const newlyVerifiedDecryption = await decryption.fetchAndVerifyRemainingSenders(this._hsApi, log);
-                        const verifiedEntries = [];
+                        const newlyVerifiedDecryption: BatchDecryptionResult = await decryption.fetchAndVerifyRemainingSenders(this._hsApi, log);
+                        const verifiedEntries: EventEntry[] = [];
                         const updateCallback = entry => verifiedEntries.push(entry);
                         newlyVerifiedDecryption.applyToEntries(newEntries, updateCallback);
                         newlyVerifiedDecryption.applyToEntries(updatedEntries, updateCallback);
@@ -334,7 +361,7 @@ export class Room extends BaseRoom {
     }
 
     /** @package */
-    start(pendingOperations, parentLog) {
+    start(pendingOperations: Map<string, Operation[]> | undefined, parentLog: ILogItem) {
         if (this._roomEncryption) {
             const roomKeyShares = pendingOperations?.get("share_room_key");
             if (roomKeyShares) {
@@ -350,7 +377,7 @@ export class Room extends BaseRoom {
     }
 
     /** @package */
-    async load(summary, txn, log) {
+    async load(summary: SummaryData | undefined, txn: Transaction, log: ILogItem) {
         try {
             await super.load(summary, txn, log);
             await this._syncWriter.load(txn, log);
@@ -359,17 +386,17 @@ export class Room extends BaseRoom {
         }
     }
 
-    async _writeGapFill(gapChunk, txn, log) {
+    async _writeGapFill(gapChunk: TimelineEvent[], txn: Transaction, log: ILogItem): Promise<PendingEvent[]> {
         const removedPendingEvents = await this._sendQueue.removeRemoteEchos(gapChunk, txn, log);
         return removedPendingEvents;
     }
 
-    _applyGapFill(removedPendingEvents) {
+    _applyGapFill(removedPendingEvents: PendingEvent[]) {
         this._sendQueue.emitRemovals(removedPendingEvents);
     }
 
     /** @public */
-    sendEvent(eventType, content, attachments, log = null) {
+    sendEvent(eventType: string, content: Content, attachments?: Record<string, AttachmentUpload>, log?: ILogItem) {
         return this._platform.logger.wrapOrRun(log, "send", log => {
             log.set("id", this.id);
             return this._sendQueue.enqueueEvent(eventType, content, attachments, log);
@@ -377,7 +404,7 @@ export class Room extends BaseRoom {
     }
 
     /** @public */
-    sendRedaction(eventIdOrTxnId, reason, log = null) {
+    sendRedaction(eventIdOrTxnId: string | undefined, reason: string | undefined, log: ILogItem) {
         return this._platform.logger.wrapOrRun(log, "redact", log => {
             log.set("id", this.id);
             return this._sendQueue.enqueueRedaction(eventIdOrTxnId, reason, log);
@@ -385,7 +412,7 @@ export class Room extends BaseRoom {
     }
 
     /** @public */
-    async ensureMessageKeyIsShared(log = null) {
+    async ensureMessageKeyIsShared(log?: ILogItem) {
         if (!this._roomEncryption) {
             return;
         }
@@ -395,27 +422,27 @@ export class Room extends BaseRoom {
         });
     }
 
-    get avatarColorId() {
+    get avatarColorId(): string {
         return this._heroes?.roomAvatarColorId || this._roomId;
     }
 
-    get isUnread() {
+    get isUnread(): boolean {
         return this._summary.data.isUnread;
     }
 
-    get notificationCount() {
+    get notificationCount(): number {
         return this._summary.data.notificationCount;
     }
 
-    get highlightCount() {
+    get highlightCount(): number {
         return this._summary.data.highlightCount;
     }
 
-    get isTrackingMembers() {
+    get isTrackingMembers(): boolean {
         return this._summary.data.isTrackingMembers;
     }
 
-    async _getLastEventId() {
+    async _getLastEventId(): Promise<string | undefined> {
         const lastKey = this._syncWriter.lastMessageKey;
         if (lastKey) {
             const txn = await this._storage.readTxn([
@@ -426,7 +453,7 @@ export class Room extends BaseRoom {
         }
     }
 
-    async clearUnread(log = null) {
+    async clearUnread(log?: ILogItem): Promise<void> {
         if (this.isUnread || this.notificationCount) {
             return await this._platform.logger.wrapOrRun(log, "clearUnread", async log => {
                 log.set("id", this.id);
@@ -459,7 +486,7 @@ export class Room extends BaseRoom {
         }
     }
 
-    leave(log = null) {
+    leave(log?: ILogItem) {
         return this._platform.logger.wrapOrRun(log, "leave room", async log => {
             log.set("id", this.id);
             await this._hsApi.leave(this.id, {log}).response();
@@ -467,21 +494,21 @@ export class Room extends BaseRoom {
     }
 
     /* called by BaseRoom to pass pendingEvents when opening the timeline */
-    _getPendingEvents() {
+    _getPendingEvents(): SortedArray<PendingEvent> {
         return this._sendQueue.pendingEvents;
     }
 
     /** @package */
-    writeIsTrackingMembers(value, txn) {
+    writeIsTrackingMembers(value: boolean, txn: Transaction): SummaryData {
         return this._summary.writeIsTrackingMembers(value, txn);
     }
 
     /** @package */
-    applyIsTrackingMembersChanges(changes) {
+    applyIsTrackingMembersChanges(changes: SummaryData) {
         this._summary.applyChanges(changes);
     }
 
-    createAttachment(blob, filename) {
+    createAttachment(blob: Blob, filename: string): AttachmentUpload {
         return new AttachmentUpload({blob, filename, platform: this._platform});
     }
 
@@ -489,4 +516,32 @@ export class Room extends BaseRoom {
         super.dispose();
         this._sendQueue.dispose();
     }
+}
+
+
+export type RoomSyncPreparation = {
+    roomEncryption: RoomEncryption;
+    summaryChanges: SummaryData;
+    decryptPreparation: DecryptionPreparation;
+    decryptChanges?: DecryptionChanges;
+    retryEntries: EventEntry[];
+}
+
+export type RoomEncryptionWriteSyncChanges = {
+    shouldFlush: boolean;
+    historyVisibility: HistoryVisibility;
+}
+
+export type RoomWriteSyncChanges = {
+    summaryChanges: SummaryData;
+    roomEncryption: RoomEncryption;
+    newEntries: EventEntry[];
+    updatedEntries: EventEntry[];
+    newLiveKey: EventKey;
+    memberChanges: Map<string, MemberChange>;
+    removedPendingEvents?: PendingEvent[];
+    heroChanges?: HeroChanges;
+    powerLevelsEvent?: PowerLevelsStateEvent;
+    encryptionChanges?: RoomEncryptionWriteSyncChanges;
+    decryption?: BatchDecryptionResult;
 }

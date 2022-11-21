@@ -49,7 +49,7 @@ export class QueryTargetWrapper<T> {
     supports(methodName: string): boolean {
         return !!this._qt[methodName];
     }
-    
+
     openKeyCursor(range?: IDBQuery, direction?: IDBCursorDirection | undefined): IDBRequest<IDBCursor | null> {
         try {
             // not supported on Edge 15
@@ -63,7 +63,7 @@ export class QueryTargetWrapper<T> {
             throw new IDBRequestAttemptError("openKeyCursor", this._qt, err, [range, direction]);
         }
     }
-    
+
     openCursor(range?: IDBQuery, direction?: IDBCursorDirection | undefined): IDBRequest<IDBCursorWithValue | null> {
         try {
             LOG_REQUESTS && logRequest("openCursor", [], this._qt);
@@ -99,7 +99,7 @@ export class QueryTargetWrapper<T> {
             throw new IDBRequestAttemptError("get", this._qt, err, [key]);
         }
     }
-    
+
     getKey(key: IDBValidKey | IDBKeyRange): IDBRequest<IDBValidKey | undefined> {
         try {
             LOG_REQUESTS && logRequest("getKey", [key], this._qt);
@@ -157,11 +157,11 @@ export class Store<T> extends QueryTarget<T> {
         // If this request fails, the error will bubble up to the transaction and abort it,
         // which is the behaviour we want. Therefore, it is ok to not create a promise for this
         // request and await it.
-        // 
+        //
         // Perhaps at some later point, we will want to handle an error (like ConstraintError) for
         // individual write requests. In that case, we should add a method that returns a promise (e.g. putAndObserve)
         // and call preventDefault on the event to prevent it from aborting the transaction
-        // 
+        //
         // Note that this can still throw synchronously, like it does for TransactionInactiveError,
         // see https://www.w3.org/TR/IndexedDB-2/#transaction-lifetime-concept
         const request = this._idbStore.put(value);
@@ -180,7 +180,7 @@ export class Store<T> extends QueryTarget<T> {
             return true;
         } catch (err) {
             if (err instanceof IDBRequestError) {
-                log.log({l: "could not write", id: this._getKeys(value), e: err}, log.level.Warn);
+                log?.log({l: "could not write", id: this._getKeys(value), e: err}, log.level.Warn);
                 err.preventTransactionAbort();
                 return false;
             } else {

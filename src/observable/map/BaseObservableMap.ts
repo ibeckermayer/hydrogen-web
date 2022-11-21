@@ -64,7 +64,7 @@ export abstract class BaseObservableMap<K, V> extends BaseObservable<IMapObserve
         }
     }
 
-    join<E extends BaseObservableMap<K, V>>(...otherMaps: Array<E>): JoinedMap<K, V> {
+    join<E extends BaseObservableMap<K, V>, F extends BaseObservableMap<K, V>>(...otherMaps: Array<E> | Array<F>): JoinedMap<K, V> {
         return new JoinedMap([this as BaseObservableMap<K, V>].concat(otherMaps));
      }
 

@@ -72,7 +72,7 @@ export abstract class BaseTileViewModel extends ViewModel {
     protected abstract get _avatarSource(): AvatarSource;
 
     // Avatar view model contract
-    get avatarLetter(): string {
+    get avatarLetter(): string | undefined {
         return avatarInitials(this.name);
     }
 

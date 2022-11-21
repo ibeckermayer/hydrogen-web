@@ -17,9 +17,9 @@ limitations under the License.
 
 import {ObservableValue} from "../observable/ObservableValue";
 
-import type {EventEntry} from "./room/timeline/entries/EventEntry";
-import type {RoomEncryption, SummaryData, DecryptionPreparation} from "./e2ee/RoomEncryption";
-import type {Room} from "./room/Room";
+
+
+import type {Room, RoomSyncPreparation, RoomWriteSyncChanges} from "./room/Room";
 import type {LogItem} from "../logging/LogItem";
 import type {ILogger, ILogItem} from "../logging/types";
 import type {HomeServerApi} from "./net/HomeServerApi";
@@ -32,7 +32,7 @@ import type {SyncPreparation} from "./DeviceMessageHandler";
 import type {EventKey} from "./room/timeline/EventKey";
 import type {MemberChange, MemberData} from "./room/members/RoomMember";
 import type {PendingEvent} from "./room/sending/PendingEvent";
-import type {HeroChanges} from "./room/members/Heroes";
+
 import type {HistoryVisibility, PowerLevelsStateEvent} from "./net/types/roomEvents";
 import type {ArchivedRoom} from "./room/ArchivedRoom";
 import type {Invite} from "./room/Invite";
@@ -195,6 +195,7 @@ export class Sync {
         })();
         const roomsPromises = roomStates.map(async rs => {
             try {
+                if (!rs.changes) throw new Error("missing changes")
                 await rs.room.afterSyncCompleted(rs.changes, log);
             } catch (err) {} // error is logged, but don't fail roomsPromises
         });
@@ -327,7 +328,7 @@ export class Sync {
             }));
             await Promise.all(roomStates.map(async rs => {
                 rs.changes = await log.wrap("room", log => rs.room.writeSync(
-                    rs.roomResponse, isInitialSync, rs.preparation, syncTxn, log));
+                    rs.roomResponse, isInitialSync, rs.preparation!, syncTxn, log));
             }));
             // important to do this after roomStates,
             // as we're referring to the roomState to get the summaryChanges
@@ -361,7 +362,8 @@ export class Sync {
             }, log.level.Detail);
         }
         for(let rs of roomStates) {
-            log.wrap("room", log => rs.room.afterSync(rs.changes, log), log.level.Detail);
+            if (!rs.changes) throw new Error("missing changes")
+            log.wrap("room", log => rs.room.afterSync(rs.changes!, log), log.level.Detail);
         }
         for(let is of inviteStates) {
             log.wrap("invite", log => is.invite.afterSync(is.changes, log), log.level.Detail);
@@ -527,38 +529,6 @@ class SessionSyncProcessState {
     dispose() {
         this.lock?.release();
     }
-}
-
-// TODO: move to Room.js when that gets converted to typescript.
-// It's the return value of Room.prepareSync().
-type RoomSyncPreparation = {
-    roomEncryption: RoomEncryption;
-    summaryChanges: SummaryData;
-    decryptPreparation: DecryptionPreparation;
-    decryptChanges: null;
-    retryEntries: EventEntry[];
-}
-
-// TODO: move to Room.js when that gets converted to typescript.
-// It's the return value of Room.writeSync().
-type RoomWriteSyncChanges = {
-    summaryChanges: SummaryData;
-    roomEncryption: RoomEncryption;
-    entries: EventEntry[];
-    updatedEntries: EventEntry[];
-    newLiveKey: EventKey | undefined;
-    memberChanges: Map<string, MemberChange | undefined>;
-    removedPendingEvents?: PendingEvent[];
-    heroChanges?: HeroChanges;
-    powerLevelsEvent?: PowerLevelsStateEvent;
-    encryptionChanges?: RoomEncryptionWriteSyncChanges;
-}
-
-// TODO: move to RoomEncryption.js when that gets converted to typescript.
-// It's the return value of RoomEncryption.writeSync().
-type RoomEncryptionWriteSyncChanges = {
-    shouldFlush: boolean;
-    historyVisibility: HistoryVisibility;
 }
 
 export class RoomSyncProcessState {

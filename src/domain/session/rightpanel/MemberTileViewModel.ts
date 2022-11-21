@@ -84,7 +84,7 @@ export class MemberTileViewModel extends ViewModel {
         this._member = newMember;
     }
 
-    get avatarLetter(): string {
+    get avatarLetter(): string | undefined{
         return avatarInitials(this.name);
     }
 

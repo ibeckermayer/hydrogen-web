@@ -27,6 +27,7 @@ import {tileClassForEntry as defaultTileClassForEntry, TimelineEntry} from "./ti
 import {joinRoom} from "../../../matrix/room/joinRoom";
 
 import type {Room} from "../../../matrix/room/Room";
+import type {ArchivedRoom} from "../../../matrix/room/ArchivedRoom";
 import type {TileClassForEntryFn, Options as TileOptions} from "./timeline/tiles";
 import type {SimpleTile} from "./timeline/tiles/SimpleTile";
 import type {Client} from "../../../matrix/Client";
@@ -175,7 +176,7 @@ export class RoomViewModel extends ViewModel implements IGridItemViewModel {
         return "";
     }
 
-    get avatarLetter(): string {
+    get avatarLetter(): string | undefined {
         return avatarInitials(this.name);
     }
 
@@ -463,7 +464,7 @@ type ArchivedViewModelOptions = {
 } & ViewModelOptions;
 
 class ArchivedViewModel extends ViewModel {
-    private _archivedRoom: Room;
+    private _archivedRoom: ArchivedRoom;
 
     constructor(options: ArchivedViewModelOptions) {
         super(options);

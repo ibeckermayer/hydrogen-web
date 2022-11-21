@@ -64,6 +64,7 @@ import type {Options as RoomBeingCreatedOptions} from "./room/RoomBeingCreated"
 import type {SyncResponse} from "./net/types/sync";
 import type {ILock} from "../utils/Lock";
 import type {ArchivedRoomSyncProcessState, InviteSyncProcessState, RoomSyncProcessState} from "./Sync";
+import { Operation } from "./storage/idb/stores/OperationStore";
 
 
 const PICKLE_KEY = "DEFAULT_KEY";
@@ -435,7 +436,7 @@ export class Session {
         });
     }
 
-    setupDehydratedDevice(key: any, log?: ILogItem) {
+    setupDehydratedDevice(key: any, log: ILogItem) {
         return this._platform.logger.wrapOrRun(log, "setupDehydratedDevice", async log => {
             const dehydrationAccount = await this._createNewAccount("temp-device-id");
             try {
@@ -450,7 +451,7 @@ export class Session {
     }
 
     /** @internal */
-    async load(log?: ILogItem) {
+    async load(log: ILogItem) {
         const txn = await this._storage.readTxn([
             this._storage.storeNames.session,
             this._storage.storeNames.roomSummary,
@@ -490,17 +491,11 @@ export class Session {
         const roomSummaries = await txn.roomSummary.getAll();
         const roomLoadPromise = Promise.all(roomSummaries.map(async summary => {
             const room = this.createJoinedRoom(summary.roomId, pendingEventsByRoomId.get(summary.roomId));
-            if (log) { await log.wrap("room", log => room.load(summary, txn, log)); } else { room.load(summary, txn, log) }
+            await log.wrap("room", log => room.load(summary, txn, log));
             this._rooms?.add(room.id, room);
         }));
         // load invites and rooms in parallel
         await Promise.all([inviteLoadPromise, roomLoadPromise]);
-        for (const [roomId, invite] of this.invites) {
-            const room = this.rooms?.get(roomId);
-            if (room) {
-                room.setInvite(invite);
-            }
-        }
     }
 
     dispose() {
@@ -574,7 +569,7 @@ export class Session {
 
         if (this._rooms) {
             for (const [_, room] of this._rooms) {
-                let roomOperationsByType;
+                let roomOperationsByType: Map<string, Operation[]> | undefined;
                 const roomOperations = operationsByScope.get(room.id);
                 if (roomOperations) {
                     roomOperationsByType = groupBy(roomOperations, r => r.type);
@@ -605,7 +600,7 @@ export class Session {
     findDirectMessageForUserId(userId: string): Room | Invite | undefined {
         if (this._rooms) {
             for (const [_ ,room] of this._rooms) {
-                if (room.isDirectMessageForUserId({ userId })) {
+                if (room.isDirectMessageForUserId(userId)) {
                     return room;
                 }
             }
@@ -1050,7 +1045,7 @@ export function tests() {
             const session = new Session({storage: createStorageMock({
                 sync: {token: "a", filterId: 5}
             })  as unknown as Storage, sessionInfo: {userId: ""} as SessionInfo} as Options);
-            await session.load();
+            await session.load({} as ILogItem);
             let syncSet = false;
             const syncTxn = {
                 session: {

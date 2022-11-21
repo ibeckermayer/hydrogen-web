@@ -336,7 +336,7 @@ export class SessionViewModel extends ViewModel {
         }
         if (eventId) {
             const room = this._roomFromNavigation();
-            this._lightboxViewModel = this.track(new LightboxViewModel(this.childOptions({eventId, room})));
+            if (room) this._lightboxViewModel = this.track(new LightboxViewModel(this.childOptions({eventId, room})));
         }
         this.emitChange("lightboxViewModel");
     }
@@ -356,7 +356,7 @@ export class SessionViewModel extends ViewModel {
         const enable = !!this.navigation.path.get("right-panel")?.value;
         if (enable) {
             const room = this._roomFromNavigation();
-            this._rightPanelViewModel = this.track(new RightPanelViewModel(this.childOptions({room, session: this.client.session})));
+            if (room) this._rightPanelViewModel = this.track(new RightPanelViewModel(this.childOptions({room, session: this.client.session})));
         }
         this.emitChange("rightPanelViewModel");
     }
