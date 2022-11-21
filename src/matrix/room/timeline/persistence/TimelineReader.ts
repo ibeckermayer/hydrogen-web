@@ -41,7 +41,7 @@ class ReaderRequest {
     dispose(): void {
         if (this.decryptRequest) {
             this.decryptRequest.dispose();
-            this.decryptRequest = null;
+            this.decryptRequest = undefined;
         }
     }
 }

@@ -124,7 +124,7 @@ export class ArchivedRoom extends BaseRoom {
         return this._kickDetails?.reason;
     }
 
-    isArchived() {
+    get isArchived() {
         return true;
     }
 

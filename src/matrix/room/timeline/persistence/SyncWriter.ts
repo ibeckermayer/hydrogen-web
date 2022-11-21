@@ -177,10 +177,10 @@ export class SyncWriter {
         timelineEvents: ClientEventWithoutRoomID[],
         timeline: Timeline | undefined,
         memberSync: MemberSync,
-        currentKey: EventKey | undefined,
+        currentKey: EventKey,
         txn: Transaction,
         log: ILogItem
-    ): Promise<{ currentKey: EventKey | undefined; entries: EventEntry[]; updatedEntries: EventEntry[]; }> {
+    ): Promise<{ currentKey: EventKey; entries: EventEntry[]; updatedEntries: EventEntry[]; }> {
         const entries: EventEntry[] = [];
         const updatedEntries: EventEntry[] = [];
         if (timelineEvents?.length && timeline) {
@@ -265,7 +265,7 @@ export class SyncWriter {
             await this._writeStateEvents(stateEvents, txn, log);
         }
         const {currentKey, entries, updatedEntries} =
-            await this._writeTimeline(timelineEvents, timeline, memberSync, this._lastLiveKey, txn, log);
+            await this._writeTimeline(timelineEvents, timeline, memberSync, this._lastLiveKey!, txn, log);
         const memberChanges = await memberSync.write(txn);
         return {entries, updatedEntries, newLiveKey: currentKey, memberChanges};
     }
@@ -282,8 +282,8 @@ export class SyncWriter {
 export type SyncWriterResult = {
     entries: EventEntry[];
     updatedEntries: EventEntry[];
-    newLiveKey: EventKey | undefined;
-    memberChanges: Map<string, MemberChange | undefined>;
+    newLiveKey: EventKey;
+    memberChanges: Map<string, MemberChange>;
 };
 
 import {createMockStorage} from "../../../../mocks/Storage";

@@ -17,12 +17,12 @@ limitations under the License.
 import { Platform } from "../platform/web/Platform";
 import { MediaRepository } from "../matrix/net/MediaRepository";
 
-export function avatarInitials(name: string): string {
-    let firstChar = name.charAt(0);
+export function avatarInitials(name?: string): string | undefined{
+    let firstChar = name?.charAt(0);
     if (firstChar === "!" || firstChar === "@" || firstChar === "#") {
-        firstChar = name.charAt(1);
+        firstChar = name?.charAt(1);
     }
-    return firstChar.toUpperCase();
+    return firstChar?.toUpperCase();
 }
 
 /**

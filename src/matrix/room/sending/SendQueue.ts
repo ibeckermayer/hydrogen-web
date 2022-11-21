@@ -161,7 +161,7 @@ export class SendQueue {
         return relatedEventWithoutRemoteId;
     }
 
-    async removeRemoteEchos(events: TimelineEvent[], txn: Transaction, parentLog: ILogItem): Promise<PendingEvent[]> {
+    async removeRemoteEchos(events: TimelineEvent[], txn: Transaction, parentLog?: ILogItem): Promise<PendingEvent[]> {
         const removed: PendingEvent[] = [];
         for (const event of events) {
             const txnId = event.unsigned && event.unsigned.transaction_id;
@@ -174,7 +174,7 @@ export class SendQueue {
             if (idx !== -1) {
                 const pendingEvent = this._pendingEvents.get(idx);
                 const remoteId = event.event_id;
-                parentLog.log({l: "removeRemoteEcho", queueIndex: pendingEvent!.queueIndex, remoteId, txnId});
+                parentLog?.log({l: "removeRemoteEcho", queueIndex: pendingEvent!.queueIndex, remoteId, txnId});
                 txn.pendingEvents.remove(pendingEvent!.roomId, pendingEvent!.queueIndex);
                 removed.push(pendingEvent!);
                 await this._resolveRemoteIdInPendingRelations(txnId, remoteId, txn);
@@ -232,8 +232,8 @@ export class SendQueue {
     async enqueueEvent(
         eventType: string,
         content: EventContent,
-        attachments: Record<string, AttachmentUpload> | null,
-        log: ILogItem | NullLogItem
+        attachments: Record<string, AttachmentUpload> | undefined,
+        log: ILogItem,
     ): Promise<void> {
         const relation = getRelationFromContent(content);
         let relatedTxnId: string | undefined;
@@ -262,10 +262,10 @@ export class SendQueue {
     async _enqueueEvent(
         eventType: string,
         content: EventContent,
-        attachments: Record<string, AttachmentUpload> | null,
+        attachments: Record<string, AttachmentUpload> | undefined,
         relatedTxnId: string | undefined,
         relatedEventId: string | undefined,
-        log: ILogItem | NullLogItem
+        log: ILogItem,
     ): Promise<void> {
         const pendingEvent = await this._createAndStoreEvent(eventType, content, relatedTxnId, relatedEventId, attachments);
         this._pendingEvents.set(pendingEvent);
@@ -280,16 +280,16 @@ export class SendQueue {
     }
 
     async enqueueRedaction(
-        eventIdOrTxnId: string | null,
-        reason: string | null, // TODO: it can for sure be null, I'm not sure if its string
-        log: ILogItem | NullLogItem
+        eventIdOrTxnId: string | undefined,
+        reason: string | undefined,
+        log: ILogItem
     ): Promise<void> {
         const isAlreadyRedacting = this._pendingEvents.array.some(pe => {
             return pe.eventType === REDACTION_TYPE &&
                 (pe.relatedTxnId === eventIdOrTxnId || pe.relatedEventId === eventIdOrTxnId);
         });
         if (isAlreadyRedacting) {
-            log.set("already_redacting", true);
+            log?.set("already_redacting", true);
             return;
         }
         let relatedTxnId;
@@ -301,7 +301,7 @@ export class SendQueue {
             if (pe && !pe.remoteId && pe.status !== SendStatus.Sending) {
                 // haven't started sending this event yet,
                 // just remove it from the queue
-                log.set("remove", relatedTxnId);
+                log?.set("remove", relatedTxnId);
                 await pe.abort();
                 return;
             } else if (pe) {
@@ -323,9 +323,9 @@ export class SendQueue {
                 relatedTxnId = pe.txnId;
             }
         }
-        log.set("relatedTxnId", relatedTxnId);
-        log.set("relatedEventId", relatedEventId);
-        await this._enqueueEvent(REDACTION_TYPE, {reason}, null, relatedTxnId, relatedEventId, log);
+        log?.set("relatedTxnId", relatedTxnId);
+        log?.set("relatedEventId", relatedEventId);
+        await this._enqueueEvent(REDACTION_TYPE, {reason}, undefined, relatedTxnId, relatedEventId, log);
     }
 
     get pendingEvents(): SortedArray<PendingEvent> {
@@ -418,7 +418,7 @@ export function tests() {
             // 1. enqueue and start send event 1
             const queue = new SendQueue({roomId: "!abc", storage, hsApi: hs.api});
             const event1 = withTextBody("message 1", createEvent("m.room.message", "$123"));
-            await logger.run("event1", log => queue.enqueueEvent(event1.type, event1.content, null, log));
+            await logger.run("event1", log => queue.enqueueEvent(event1.type, event1.content, undefined, log));
             assert.equal(queue.pendingEvents.length, 1);
             const sendRequest1 = hs.requests.send[0];
             // 2. receive remote echo, before /send has returned
@@ -431,7 +431,7 @@ export function tests() {
             assert.equal(queue.pendingEvents.length, 0);
             // 3. now enqueue event 2
             const event2 = withTextBody("message 2", createEvent("m.room.message", "$456"));
-            await logger.run("event2", log => queue.enqueueEvent(event2.type, event2.content, null, log));
+            await logger.run("event2", log => queue.enqueueEvent(event2.type, event2.content, undefined, log));
             // even though the first pending event has been removed by the remote echo,
             // the second should get the next index, as the send loop is still blocking on the first one
             assert.equal(Array.from(queue.pendingEvents)[0].queueIndex, 2);
@@ -449,11 +449,11 @@ export function tests() {
                 hsApi: new MockHomeServer().api
             });
             // first, enqueue a message that will be attempted to send, but we don't respond
-            await queue.enqueueEvent("m.room.message", {body: "hello!"}, null, new NullLogItem(new NullLogger()));
+            await queue.enqueueEvent("m.room.message", {body: "hello!"}, undefined, new NullLogItem(new NullLogger()));
 
             const observer = new ListObserver();
             queue.pendingEvents.subscribe(observer);
-            await queue.enqueueEvent("m.room.message", {body: "...world"}, null, new NullLogItem(new NullLogger()));
+            await queue.enqueueEvent("m.room.message", {body: "...world"}, undefined, new NullLogItem(new NullLogger()));
             let txnId;
             {
                 const {type, index, value} = await observer.next();
@@ -462,7 +462,7 @@ export function tests() {
                 assert.equal(typeof value.txnId, "string");
                 txnId = value.txnId;
             }
-            await queue.enqueueRedaction(txnId, null, new NullLogItem(new NullLogger()));
+            await queue.enqueueRedaction(txnId, undefined, new NullLogItem(new NullLogger()));
             {
                 const {type, value, index} = await observer.next();
                 assert.equal(type, "remove");
@@ -477,9 +477,9 @@ export function tests() {
                 hsApi: new MockHomeServer().api
             });
             assert.equal(queue.pendingEvents.length, 0);
-            await queue.enqueueRedaction("!event", null, new NullLogItem(new NullLogger()));
+            await queue.enqueueRedaction("!event", undefined, new NullLogItem(new NullLogger()));
             assert.equal(queue.pendingEvents.length, 1);
-            await queue.enqueueRedaction("!event", null, new NullLogItem(new NullLogger()));
+            await queue.enqueueRedaction("!event", undefined, new NullLogItem(new NullLogger()));
             assert.equal(queue.pendingEvents.length, 1);
         },
         "duplicate reaction gets dropped": async (assert): Promise<void> => {
@@ -489,11 +489,11 @@ export function tests() {
                 hsApi: new MockHomeServer().api
             });
             assert.equal(queue.pendingEvents.length, 0);
-            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "🚀"), null, new NullLogItem(new NullLogger()));
+            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "🚀"), undefined, new NullLogItem(new NullLogger()));
             assert.equal(queue.pendingEvents.length, 1);
-            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "👋"), null, new NullLogItem(new NullLogger()));
+            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "👋"), undefined, new NullLogItem(new NullLogger()));
             assert.equal(queue.pendingEvents.length, 2);
-            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "🚀"), null, new NullLogItem(new NullLogger()));
+            await queue.enqueueEvent("m.reaction", createAnnotation("!target", "🚀"), undefined, new NullLogItem(new NullLogger()));
             assert.equal(queue.pendingEvents.length, 2);
         },
 

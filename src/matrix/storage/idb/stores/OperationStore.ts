@@ -28,7 +28,7 @@ interface BaseOperation {
 
 type OperationType = { type: "share_room_key"; roomKeyMessage: RoomKeyMessage; }
 
-type Operation = BaseOperation & OperationType
+export type Operation = BaseOperation & OperationType
 
 type OperationEntry = Operation & { scopeTypeKey: string; }
 

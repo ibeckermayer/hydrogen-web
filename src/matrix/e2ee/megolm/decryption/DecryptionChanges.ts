@@ -81,7 +81,7 @@ export class DecryptionChanges {
     }
 }
 
-type MegolmBatchDecryptionResult = {
+export type MegolmBatchDecryptionResult = {
     // a map of event id to decryption result
     results: Map<string, DecryptionResult>;
     // event id -> errors

@@ -58,7 +58,7 @@ export class RoomBeingCreatedViewModel extends ViewModel implements IGridItemVie
         }
         return "";
     }
-    get avatarLetter(): string { return avatarInitials(this.name); }
+    get avatarLetter(): string | undefined { return avatarInitials(this.name); }
     get avatarColorNumber(): number { return getIdentifierColorNumber(this._roomBeingCreated.avatarColorId); }
     get avatarTitle(): string { return this.name; }
 

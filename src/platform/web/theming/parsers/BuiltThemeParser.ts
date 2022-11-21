@@ -64,7 +64,7 @@ export class BuiltThemeParser {
                      * We'll add these to the themeMapping (separately) keyed with just the
                      * theme-name (i.e "Element" instead of "Element Dark").
                      * We need to be able to distinguish them from other variants!
-                     * 
+                     *
                      * This allows us to render radio-buttons with "dark" and
                      * "light" options.
                     */

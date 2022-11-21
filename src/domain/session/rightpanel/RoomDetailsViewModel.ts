@@ -54,7 +54,7 @@ export class RoomDetailsViewModel extends ViewModel {
         return this._room.canonicalAlias;
     }
 
-    get name(): string {
+    get name(): string| undefined {
         return this._room.name;
     }
 
@@ -66,7 +66,7 @@ export class RoomDetailsViewModel extends ViewModel {
         return this._room.joinedMemberCount;
     }
 
-    get avatarLetter(): string {
+    get avatarLetter(): string | undefined {
         return avatarInitials(this.name);
     }
 
@@ -78,7 +78,7 @@ export class RoomDetailsViewModel extends ViewModel {
         return getAvatarHttpUrl(this._room.avatarUrl, size, this.platform, this._room.mediaRepository);
     }
 
-    get avatarTitle(): string {
+    get avatarTitle(): string | undefined {
         return this.name;
     }
 

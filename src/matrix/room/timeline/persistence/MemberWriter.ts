@@ -139,8 +139,8 @@ export class MemberSync {
         return await this._memberWriter.lookupMember(userId, txn);
     }
 
-    async write(txn: Transaction): Promise<Map<string, MemberChange | undefined>> {
-        const memberChanges = new Map<string, MemberChange | undefined>();
+    async write(txn: Transaction): Promise<Map<string, MemberChange>> {
+        const memberChanges = new Map<string, MemberChange>();
         let newTimelineMembers: Map<string, RoomMember> | undefined;
         if (this._timelineEvents) {
             newTimelineMembers = this._timelineEventsToMembers(this._timelineEvents);

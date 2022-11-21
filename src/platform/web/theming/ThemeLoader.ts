@@ -32,7 +32,7 @@ export class ThemeLoader {
         this._platform = platform;
     }
 
-    async init(manifestLocations: string[], log?: ILogItem): Promise<void> {
+    async init(manifestLocations: string[], log: ILogItem): Promise<void> {
         await this._platform.logger.wrapOrRun(log, "ThemeLoader.init", async (log) => {
             let noManifestsAvailable = true;
             const failedManifestLoads: string[] = [];
@@ -89,7 +89,7 @@ export class ThemeLoader {
         });
     }
 
-    async setTheme(themeName: string, themeVariant?: "light" | "dark" | "default", log?: ILogItem) {
+    async setTheme(themeName: string, themeVariant: "light" | "dark" | "default" | undefined, log: ILogItem) {
         await this._platform.logger.wrapOrRun(log, { l: "change theme", name: themeName, variant: themeVariant }, async (l) => {
             let cssLocation: string, variables: Record<string, string>;
             let themeDetails = this._themeMapping[themeName];
