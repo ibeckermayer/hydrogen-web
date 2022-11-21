@@ -21,7 +21,8 @@ import type {Transaction} from "../../storage/idb/Transaction";
 import type {RoomSummary} from "../RoomSummary";
 import type {HomeServerApi} from "../../net/HomeServerApi";
 import type {SummaryData} from "../RoomSummary";
-import {MemberStateEvent} from "../../net/types/roomEvents";
+import type {MemberStateEvent} from "../../net/types/roomEvents";
+import type {Storage} from "../../storage/idb/Storage";
 
 
 async function loadMembers({roomId, storage, txn}: LoadMembersOptions): Promise<RoomMember[]> {
@@ -161,7 +162,7 @@ async function fetchMember({roomId, userId, hsApi, storage}: FetchMemberOptions,
 
 type FetchMembersOptions = {
     hsApi: HomeServerApi;
-    log: ILogItem;
+    log?: ILogItem;
     setChangedMembersMap: (map: Map<string, RoomMember> | null) => void;
     summary: RoomSummary;
     syncToken: string;
@@ -192,7 +193,7 @@ type LoadMemberOptions = {
 
 type FetchOrLoadMemberOptions = {
     summary: RoomSummary;
-    log: ILogItem;
+    log?: ILogItem;
 } & FetchMemberOptions &
     LoadMemberOptions;
 

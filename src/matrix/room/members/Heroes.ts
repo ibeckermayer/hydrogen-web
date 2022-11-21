@@ -24,7 +24,7 @@ import { Profile, UserIdProfile } from "../../profile";
 export function calculateRoomName(
     sortedMembers: RoomMember[] | Profile[] | UserIdProfile[],
     summaryData: { joinCount: number; inviteCount: number },
-    log: ILogItem
+    log?: ILogItem
 ): string {
     const countWithoutMe = summaryData.joinCount + summaryData.inviteCount - 1;
     if (sortedMembers.length >= countWithoutMe) {
@@ -37,7 +37,7 @@ export function calculateRoomName(
             if (otherMember) {
                 return otherMember.name;
             } else {
-                log.log({l: "could get get other member name", length: sortedMembers.length, otherMember: !!otherMember});
+                log?.log({l: "could get get other member name", length: sortedMembers.length, otherMember: !!otherMember});
                 return "Unknown DM Name";
             }
         }
@@ -100,7 +100,7 @@ export class Heroes {
             removedUserIds: string[];
         },
         summaryData: SummaryData,
-        log: ILogItem
+        log?: ILogItem
     ): void {
         for (const userId of removedUserIds) {
             this._members.delete(userId);

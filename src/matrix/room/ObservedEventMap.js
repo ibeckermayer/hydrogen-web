@@ -47,7 +47,7 @@ export class ObservedEventMap {
     }
 }
 
-class ObservedEvent extends BaseObservableValue {
+export class ObservedEvent extends BaseObservableValue {
     constructor(eventMap, entry, id) {
         super();
         this._eventMap = eventMap;

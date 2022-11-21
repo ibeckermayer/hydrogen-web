@@ -214,7 +214,7 @@ export class Session {
             rotation_period_ms?: number;
             rotation_period_msgs?: number;
         }
-    ) {
+    ): RoomEncryption | null {
         // TODO: this will actually happen when users start using the e2ee version for the first time
 
         // this should never happen because either a session was already synced once
@@ -605,7 +605,7 @@ export class Session {
     findDirectMessageForUserId(userId: string): Room | Invite | undefined {
         if (this._rooms) {
             for (const [_ ,room] of this._rooms) {
-                if (room.isDirectMessageForUserId(userId)) {
+                if (room.isDirectMessageForUserId({ userId })) {
                     return room;
                 }
             }

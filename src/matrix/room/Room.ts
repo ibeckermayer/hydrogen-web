@@ -26,7 +26,6 @@ import {DecryptionSource} from "../e2ee/common";
 import {PowerLevels} from "./PowerLevels";
 import {RoomEventType} from "../net/types/roomEvents";
 
-const EVENT_ENCRYPTED_TYPE = "m.room.encrypted";
 
 export class Room extends BaseRoom {
     constructor(options) {
@@ -88,7 +87,7 @@ export class Room extends BaseRoom {
                 }
             }
             eventsToDecrypt = eventsToDecrypt.filter(event => {
-                return event?.type === EVENT_ENCRYPTED_TYPE;
+                return event?.type === RoomEventType.Encrypted;
             });
             if (eventsToDecrypt.length) {
                 decryptPreparation = await roomEncryption.prepareDecryptAll(
