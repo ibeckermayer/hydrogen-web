@@ -60,6 +60,7 @@ export class InviteTileViewModel extends BaseTileViewModel {
 
 import {Navigation} from "../../navigation/Navigation";
 import {TestURLRouter} from './common';
+import type {Platform} from "../../../platform/web/Platform";
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function tests() {
     return {
@@ -67,14 +68,14 @@ export function tests() {
             const vm1 = new InviteTileViewModel({
                 invite: { timestamp: 500, id: "1" },
                 urlRouter: TestURLRouter,
-                platform: undefined,
+                platform: undefined as unknown as Platform,
                 logger: nullLogger,
                 navigation: new Navigation(() => true),
             });
             const vm2 = new InviteTileViewModel({
                 invite: { timestamp: 250, id: "2" },
                 urlRouter: TestURLRouter,
-                platform: undefined,
+                platform: undefined as unknown as Platform,
                 logger: nullLogger,
                 navigation: new Navigation(() => true),
             });

@@ -14,11 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export async function estimateStorageUsage() {
+export async function estimateStorageUsage(): Promise<{
+    quota?: number;
+    usage?: number;
+}> {
     if (navigator?.storage?.estimate) {
         const {quota, usage} = await navigator.storage.estimate();
         return {quota, usage};
     } else {
-        return {quota: null, usage: null};
+        return {quota: undefined, usage: undefined};
     }
 }

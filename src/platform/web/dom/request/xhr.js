@@ -20,7 +20,7 @@ import {
 } from "../../../../matrix/error";
 import {addCacheBuster, mapAsFormData} from "./common";
 
-class RequestResult {
+export class RequestResult {
     constructor(promise, xhr) {
         this._promise = promise;
         this._xhr = xhr;

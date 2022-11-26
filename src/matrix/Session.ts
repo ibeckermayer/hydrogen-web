@@ -74,7 +74,7 @@ type Options = {
     storage: Storage;
     hsApi: HomeServerApi;
     sessionInfo: SessionInfo;
-    olm: typeof window.Olm | null;
+    olm: typeof window.Olm | undefined;
     olmWorker?: OlmWorker;
     platform: Platform;
     mediaRepository: MediaRepository;
@@ -88,7 +88,7 @@ export class Session {
     private _mediaRepository: MediaRepository;
     private _syncInfo?: any;
     private _sessionInfo: SessionInfo;
-    private _olm: typeof window.Olm | null;
+    private _olm: typeof window.Olm | undefined;
     private _olmWorker?: OlmWorker;
     private _olmUtil?: Utility;
     private _user: User;
@@ -167,7 +167,7 @@ export class Session {
 
     // called once this._e2eeAccount is assigned
     _setupEncryption() {
-        if (this._olm === null || !this._olmUtil || !this._storage) {
+        if (!this._olm || !this._olmUtil || !this._storage) {
             throw new Error("could not setup encryption")
         }
 
@@ -336,7 +336,7 @@ export class Session {
     _createKeyBackup(ssssKey: SSSSKey, txn: Transaction, log: ILogItem): Promise<boolean> {
         return log.wrap("enable key backup", async log => {
             try {
-                if (this._olm === null || !this._keyLoader) throw new Error("could not create key backup")
+                if (!this._olm || !this._keyLoader) throw new Error("could not create key backup")
                 const secretStorage = new SecretStorage({key: ssssKey, platform: this._platform});
                 const keyBackup = await KeyBackup.fromSecretStorage(
                     this._platform,
@@ -1001,7 +1001,7 @@ export class Session {
         });
     }
 
-    joinRoom(roomIdOrAlias: string, log?: ILogItem): string {
+    joinRoom(roomIdOrAlias: string, log?: ILogItem): Promise<string> {
         return this._platform.logger.wrapOrRun(log, "joinRoom", async log => {
             const body = await this._hsApi.joinIdOrAlias(roomIdOrAlias, {log}).response();
             return body.room_id;
