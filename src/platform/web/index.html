@@ -22,13 +22,6 @@
             if (import.meta.env.PROD) {
                 assetPaths.serviceWorker = "sw.js";
             }
-            console.log("new Platform")
-            console.log("assetPaths = ")
-            console.log(assetPaths)
-            console.log("configURL = ")
-            console.log(configURL)
-            console.log("options = ")
-            console.log({development: import.meta.env.DEV})
             const platform = new Platform({
                 container: document.body,
                 assetPaths,

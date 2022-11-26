@@ -22,31 +22,34 @@ import {LocationView} from "./timeline/LocationView";
 import {MissingAttachmentView} from "./timeline/MissingAttachmentView";
 import {AnnouncementView} from "./timeline/AnnouncementView";
 import {RedactedView} from "./timeline/RedactedView";
-import {SimpleTile} from "../../../../../domain/session/room/timeline/tiles/SimpleTile";
+import {ITile, TileShape} from "../../../../../domain/session/room/timeline/tiles/ITile";
 import {GapView} from "./timeline/GapView";
-import type {TileViewConstructor, ViewClassForEntryFn} from "./TimelineView";
+import {DateHeaderView} from "./timeline/DateHeaderView";
+import type {TileViewConstructor} from "./TimelineView";
 
-export function viewClassForTile(vm: SimpleTile): TileViewConstructor {
+export function viewClassForTile(vm: ITile): TileViewConstructor {
     switch (vm.shape) {
-        case "gap":
+        case TileShape.Gap:
             return GapView;
-        case "announcement":
+        case TileShape.Announcement:
             return AnnouncementView;
-        case "message":
-        case "message-status":
+        case TileShape.Message:
+        case TileShape.MessageStatus:
             return TextMessageView;
-        case "image":
+        case TileShape.Image:
             return ImageView;
-        case "video":
+        case TileShape.Video:
             return VideoView;
-        case "file":
+        case TileShape.File:
             return FileView;
-        case "location":
+        case TileShape.Location:
             return LocationView;
-        case "missing-attachment":
+        case TileShape.MissingAttachment:
             return MissingAttachmentView;
-        case "redacted":
+        case TileShape.Redacted:
             return RedactedView;
+        case TileShape.DateHeader:
+            return DateHeaderView;
         default:
             throw new Error(`Tiles of shape "${vm.shape}" are not supported, check the tileClassForEntry function in the view model`);
     }

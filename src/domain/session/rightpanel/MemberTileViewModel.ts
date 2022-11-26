@@ -59,9 +59,9 @@ export class MemberTileViewModel extends ViewModel {
         return this._nameChanged;
     }
 
-    get detailsUrl(): string {
-        const roomId = this.navigation.path.get("room")!.value;
-        return `${this.urlRouter.openRoomActionUrl(roomId)}/member/${this._member.userId}`;
+    get detailsUrl() {
+        const roomId = this.navigation.path.get("room")?.value;
+        return `${this.urlRouter.openRoomActionUrl(roomId)}/member/${encodeURIComponent(this._member.userId)}`;
     }
 
     _updatePreviousName(newName: string): void {

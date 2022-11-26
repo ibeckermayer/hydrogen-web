@@ -39,6 +39,7 @@ import {Disposables} from "../../utils/Disposables";
 import {parseHTML, HTMLParseResult} from "./parsehtml";
 import {handleAvatarError} from "./ui/avatar";
 import {ThemeLoader} from "./theming/ThemeLoader";
+import {TimeFormatter} from "./dom/TimeFormatter";
 
 declare global {
     interface Window {
@@ -53,8 +54,6 @@ declare global {
     interface Navigator { msSaveBlob: (blobHandle: BlobHandle, filename: string) => void }
     const DEFINE_VERSION: string;
 }
-
-
 
 
 function addScript(src: string) {
@@ -165,11 +164,6 @@ type Options = {
 
 
 export class Platform {
-    private _container: HTMLElement;
-    private _assetPaths: AssetPaths;
-    private _config?: any;
-    private _configURL: string;
-    private _serviceWorkerHandler?: ServiceWorkerHandler;
     crypto?: Crypto;
     settingsStorage: SettingsStorage;
     clock: Clock;
@@ -184,9 +178,16 @@ export class Platform {
     request: FetchRequestResult | ((url: any, options: any) => XhrRequestResult);
     isIE11: boolean;
     isIOS: boolean;
+    notificationService?: NotificationService;
+    timeFormatter: TimeFormatter;
+
+    private _container: HTMLElement;
+    private _assetPaths: AssetPaths;
+    private _config?: any;
+    private _configURL: string;
+    private _serviceWorkerHandler?: ServiceWorkerHandler;
     private _disposables: Disposables;
     private _themeLoader?: ThemeLoader;
-    notificationService?: NotificationService;
     private _olmPromise?: Promise<typeof Olm | undefined>
     private _workerPromise?: Promise<OlmWorker>;
 
@@ -202,6 +203,7 @@ export class Platform {
         this._createLogger(options?.development);
         this.history = new History();
         this.onlineStatus = new OnlineStatus();
+        this.timeFormatter = new TimeFormatter();
         this._serviceWorkerHandler = null;
         if (assetPaths.serviceWorker && "serviceWorker" in navigator) {
             this._serviceWorkerHandler = new ServiceWorkerHandler();
