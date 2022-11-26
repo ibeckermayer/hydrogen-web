@@ -16,7 +16,7 @@ limitations under the License.
 
 import DOMPurify from "dompurify"
 
-class HTMLParseResult {
+export class HTMLParseResult {
     constructor(bodyNode) {
         this._bodyNode = bodyNode;
     }
@@ -24,7 +24,7 @@ class HTMLParseResult {
     get rootNodes() {
         return Array.from(this._bodyNode.childNodes);
     }
-    
+
     getChildNodes(node) {
         return Array.from(node.childNodes);
     }
@@ -37,7 +37,7 @@ class HTMLParseResult {
         return node.getAttribute(attr);
     }
 
-    isTextNode(node) { 
+    isTextNode(node) {
         return node.nodeType === Node.TEXT_NODE;
     }
 

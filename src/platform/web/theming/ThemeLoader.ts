@@ -146,7 +146,7 @@ export class ThemeLoader {
         return this._themeMapping;
     }
 
-    async getActiveTheme(): Promise<{themeName: string, themeVariant?: string}> {
+    async getActiveTheme(): Promise<{themeName: string, themeVariant?: "light" | "dark" | "default"}> {
         let themeName = await this._platform.settingsStorage.getString("theme-name");
         let themeVariant = await this._platform.settingsStorage.getString("theme-variant");
         if (!themeName || !this._themeMapping[themeName]) {

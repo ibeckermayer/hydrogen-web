@@ -23,7 +23,7 @@ import {abortOnTimeout} from "../../../../utils/timeout";
 import {addCacheBuster, mapAsFormData} from "./common";
 import {xhrRequest} from "./xhr";
 
-class RequestResult {
+export class RequestResult {
     constructor(promise, controller) {
         if (!controller) {
             const abortPromise = new Promise((_, reject) => {

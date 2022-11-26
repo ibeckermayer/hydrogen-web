@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {createFetchRequest} from "./dom/request/fetch";
-import {xhrRequest} from "./dom/request/xhr";
+import {RequestResult as FetchRequestResult, createFetchRequest} from "./dom/request/fetch";
+import {RequestResult as XhrRequestResult, xhrRequest} from "./dom/request/xhr";
 import {StorageFactory} from "../../matrix/storage/idb/StorageFactory";
 import {SessionInfoStorage} from "../../matrix/sessioninfo/localstorage/SessionInfoStorage";
 import {SettingsStorage} from "./dom/SettingsStorage";
@@ -36,11 +36,28 @@ import {BlobHandle} from "./dom/BlobHandle";
 import {hasReadPixelPermission, ImageHandle, VideoHandle} from "./dom/ImageHandle";
 import {downloadInIframe} from "./dom/download";
 import {Disposables} from "../../utils/Disposables";
-import {parseHTML} from "./parsehtml";
+import {parseHTML, HTMLParseResult} from "./parsehtml";
 import {handleAvatarError} from "./ui/avatar";
 import {ThemeLoader} from "./theming/ThemeLoader";
 
-function addScript(src) {
+declare global {
+    interface Window {
+        MSInputMethodContext?: any;
+        msCrypto?: any;
+        MSStream?: any;
+        __hydrogenViewModel: RootViewModel;
+
+    }
+    interface Document { documentMode?: any; }
+    interface ImportMeta { env: { DEV?: boolean } }
+    interface Navigator { msSaveBlob: (blobHandle: BlobHandle, filename: string) => void }
+    const DEFINE_VERSION: string;
+}
+
+
+
+
+function addScript(src: string) {
     return new Promise(function (resolve, reject) {
         var s = document.createElement("script");
         s.setAttribute("src", src );
@@ -50,7 +67,7 @@ function addScript(src) {
     });
 }
 
-async function loadOlm(olmPaths) {
+async function loadOlm(olmPaths?: { legacyBundle: string; wasm: string; wasmBundle: string; }): Promise<typeof Olm | undefined> {
     // make crypto.getRandomValues available without
     // a prefix on IE11, needed by olm to work
     if (window.msCrypto && !window.crypto) {
@@ -66,18 +83,17 @@ async function loadOlm(olmPaths) {
         }
         return window.Olm;
     }
-    return null;
 }
 // turn asset path to absolute path if it isn't already
 // so it can be loaded independent of base
-function assetAbsPath(assetPath) {
+function assetAbsPath(assetPath: string): string {
     if (!assetPath.startsWith("/")) {
         return new URL(assetPath, document.location.href).pathname;
     }
     return assetPath;
 }
 
-async function loadOlmWorker(assetPaths) {
+async function loadOlmWorker(assetPaths): Promise<OlmWorker> {
     const workerPool = new WorkerPool(assetPaths.worker, 4);
     await workerPool.init();
     await workerPool.sendAll({
@@ -90,18 +106,18 @@ async function loadOlmWorker(assetPaths) {
 
 // needed for mobile Safari which shifts the layout viewport up without resizing it
 // when the keyboard shows (see https://bugs.webkit.org/show_bug.cgi?id=141832)
-function adaptUIOnVisualViewportResize(container) {
+function adaptUIOnVisualViewportResize(container: HTMLElement) {
     if (!window.visualViewport) {
         return;
     }
     const handler = () => {
-        const sessionView = container.querySelector('.SessionView');
+        const sessionView = container.querySelector('.SessionView') as HTMLElement;
         if (!sessionView) {
             return;
         }
 
-        const scrollable = container.querySelector('.bottom-aligned-scroll');
-        let scrollTopBefore, heightBefore, heightAfter;
+        const scrollable = container.querySelector('.bottom-aligned-scroll') as HTMLElement;
+        let scrollTopBefore: number | undefined, heightBefore: number | undefined, heightAfter: number | undefined;
 
         if (scrollable) {
             scrollTopBefore = scrollable.scrollTop;
@@ -110,24 +126,71 @@ function adaptUIOnVisualViewportResize(container) {
 
         // Ideally we'd use window.visualViewport.offsetTop but that seems to occasionally lag
         // behind (last tested on iOS 14.4 simulator) so we have to compute the offset manually
-        const offsetTop = sessionView.offsetTop + sessionView.offsetHeight - window.visualViewport.height;
+        const offsetTop = sessionView.offsetTop + sessionView.offsetHeight - (window.visualViewport?.height || 0);
 
-        container.style.setProperty('--ios-viewport-height', window.visualViewport.height.toString() + 'px');
+        container.style.setProperty('--ios-viewport-height', window.visualViewport?.height.toString() + 'px');
         container.style.setProperty('--ios-viewport-top', offsetTop.toString() + 'px');
 
         if (scrollable) {
             heightAfter = scrollable.offsetHeight;
-            scrollable.scrollTop = scrollTopBefore + heightBefore - heightAfter;
+            scrollable.scrollTop = (scrollTopBefore || 0) + (heightBefore || 0) - heightAfter;
         }
     };
     window.visualViewport.addEventListener('resize', handler);
     return () => {
-        window.visualViewport.removeEventListener('resize', handler);
+        window.visualViewport?.removeEventListener('resize', handler);
     };
 }
 
+type AssetPaths = {
+    downloadSandbox: string;
+    olm: {
+        legacyBundle: string;
+        wasm: string;
+        wasmBundle: string;
+    }
+    worker: string;
+    serviceWorker?: string;
+}
+
+type Options = {
+    container: HTMLElement;
+    assetPaths: AssetPaths;
+    config?: any;
+    configURL: string;
+    options?: { development: boolean };
+    cryptoExtras?: any;
+}
+
+
+
 export class Platform {
-    constructor({ container, assetPaths, config, configURL, options = null, cryptoExtras = null }) {
+    private _container: HTMLElement;
+    private _assetPaths: AssetPaths;
+    private _config?: any;
+    private _configURL: string;
+    private _serviceWorkerHandler?: ServiceWorkerHandler;
+    crypto?: Crypto;
+    settingsStorage: SettingsStorage;
+    clock: Clock;
+    encoding: Encoding;
+    random: () => number;
+    logger: BaseLogger;
+    history: History;
+    onlineStatus: OnlineStatus;
+    storageFactory: StorageFactory;
+    sessionInfoStorage: SessionInfoStorage;
+    estimateStorageUsage: () => Promise<{ quota?: number; usage?: number; }>
+    request: FetchRequestResult | ((url: any, options: any) => XhrRequestResult);
+    isIE11: boolean;
+    isIOS: boolean;
+    private _disposables: Disposables;
+    private _themeLoader?: ThemeLoader;
+    notificationService?: NotificationService;
+    private _olmPromise?: Promise<typeof Olm | undefined>
+    private _workerPromise?: Promise<OlmWorker>;
+
+    constructor({ container, assetPaths, config, configURL, options = undefined, cryptoExtras = undefined }: Options) {
         this._container = container;
         this._assetPaths = assetPaths;
         this._config = config;
@@ -144,7 +207,6 @@ export class Platform {
             this._serviceWorkerHandler = new ServiceWorkerHandler();
             this._serviceWorkerHandler.registerAndStart(assetPaths.serviceWorker);
         }
-        this.notificationService = undefined;
         // Only try to use crypto when olm is provided
         if(this._assetPaths.olm) {
             this.crypto = new Crypto(cryptoExtras);
@@ -163,9 +225,7 @@ export class Platform {
         const isIOS = /iPad|iPhone|iPod/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) && !window.MSStream;
         this.isIOS = isIOS;
         this._disposables = new Disposables();
-        this._olmPromise = undefined;
-        this._workerPromise = undefined;
-        this._themeLoader = import.meta.env.DEV? null: new ThemeLoader(this);
+        this._themeLoader = import.meta.env.DEV ? undefined : new ThemeLoader(this);
     }
 
     async init() {
@@ -201,7 +261,7 @@ export class Platform {
         }
     }
 
-    _createLogger(isDevelopment) {
+    _createLogger(isDevelopment: boolean | undefined) {
         // Make sure that loginToken does not end up in the logs
         const transformer = (item) => {
             if (item.e?.stack) {
@@ -216,22 +276,22 @@ export class Platform {
         }
     }
 
-    get updateService() {
+    get updateService(): ServiceWorkerHandler | undefined {
         return this._serviceWorkerHandler;
     }
 
-    loadOlm() {
+    loadOlm(): Promise<typeof Olm | undefined> {
         if (!this._olmPromise) {
             this._olmPromise = loadOlm(this._assetPaths.olm);
         }
         return this._olmPromise;
     }
 
-    get config() {
+    get config(): any | undefined{
         return this._config;
     }
 
-    async loadOlmWorker() {
+    async loadOlmWorker(): Promise<OlmWorker | undefined> {
         if (!window.WebAssembly) {
             if (!this._workerPromise) {
                 this._workerPromise = loadOlmWorker(this._assetPaths);
@@ -240,7 +300,7 @@ export class Platform {
         }
     }
 
-    createAndMountRootView(vm) {
+    createAndMountRootView(vm: RootViewModel) {
         if (this.isIE11) {
             this._container.className += " legacy";
         }
@@ -258,15 +318,15 @@ export class Platform {
         this._container.appendChild(view.mount());
     }
 
-    setNavigation(navigation) {
+    setNavigation(navigation: Navigation<SegmentType>) {
         this._serviceWorkerHandler?.setNavigation(navigation);
     }
 
-    createBlob(buffer, mimetype) {
+    createBlob(buffer: Uint8Array, mimetype?: string): BlobHandle {
         return BlobHandle.fromBuffer(buffer, mimetype);
     }
 
-    saveFileAs(blobHandle, filename) {
+    saveFileAs(blobHandle: BlobHandle, filename: string) {
         if (navigator.msSaveBlob) {
             navigator.msSaveBlob(blobHandle.nativeBlob, filename);
         } else {
@@ -274,17 +334,20 @@ export class Platform {
         }
     }
 
-    openFile(mimeType = null) {
+    openFile(mimeType?: string): Promise<{ name: string; blob: BlobHandle; } | void> {
         const input = document.createElement("input");
         input.setAttribute("type", "file");
         input.className = "hidden";
         if (mimeType) {
             input.setAttribute("accept", mimeType);
         }
-        const promise = new Promise(resolve => {
+        const promise = new Promise<{
+            name: string;
+            blob: BlobHandle;
+        } | void>(resolve => {
             const checkFile = () => {
                 input.removeEventListener("change", checkFile, true);
-                const file = input.files[0];
+                const file = input.files ? input.files[0] : undefined;
                 this._container.removeChild(input);
                 if (file) {
                     resolve({name: file.name, blob: BlobHandle.fromBlob(file)});
@@ -300,39 +363,39 @@ export class Platform {
         return promise;
     }
 
-    openUrl(url) {
+    openUrl(url: string) {
         location.href = url;
     }
 
-    parseHTML(html) {
+    parseHTML(html: string): HTMLParseResult {
         return parseHTML(html);
     }
 
-    async loadImage(blob) {
+    async loadImage(blob: BlobHandle): ImageHandle {
         return ImageHandle.fromBlob(blob);
     }
 
-    async loadVideo(blob) {
+    async loadVideo(blob: BlobHandle): VideoHandle {
         return VideoHandle.fromBlob(blob);
     }
 
-    hasReadPixelPermission() {
+    hasReadPixelPermission(): boolean {
         return hasReadPixelPermission();
     }
 
-    get devicePixelRatio() {
+    get devicePixelRatio(): number {
         return window.devicePixelRatio || 1;
     }
 
-    get version() {
+    get version(): string {
         return DEFINE_VERSION;
     }
 
-    get themeLoader() {
+    get themeLoader(): ThemeLoader | undefined {
         return this._themeLoader;
     }
 
-    async replaceStylesheet(newPath, log) {
+    async replaceStylesheet(newPath: string, log: ILogItem) {
         const error = await this.logger.wrapOrRun(log, { l: "replaceStylesheet", location: newPath, }, async (l) => {
             let error;
             const head = document.querySelector("head");
@@ -344,7 +407,7 @@ export class Platform {
             styleTag.rel = "stylesheet";
             styleTag.type = "text/css";
             styleTag.className = "theme";
-            const promise = new Promise(resolve => {
+            const promise = new Promise<void>(resolve => {
                 styleTag.onerror = () => {
                     error = new Error(`Failed to load stylesheet from ${newPath}`);
                     l.catch(error);
@@ -354,7 +417,7 @@ export class Platform {
                     resolve();
                 };
             });
-            head.appendChild(styleTag);
+            head?.appendChild(styleTag);
             await promise;
             return error;
         });
@@ -363,7 +426,7 @@ export class Platform {
         }
     }
 
-    get description() {
+    get description(): string {
         return navigator.userAgent ?? "<unknown>";
     }
 
@@ -373,6 +436,12 @@ export class Platform {
 }
 
 import {LogItem} from "../../logging/LogItem";
+import { BaseLogger } from "../../logging/BaseLogger";
+import Olm from "@matrix-org/olm";
+import { RootViewModel } from "../../domain/RootViewModel";
+import { Navigation } from "../../domain/navigation/Navigation";
+import { SegmentType } from "../../domain/navigation";
+import { ILogItem } from "../../logging/types";
 export function tests() {
     return {
         "loginToken should not be in logs": (assert) => {
@@ -383,18 +452,18 @@ export function tests() {
                 return item;
             };
             const logger = {
-                _queuedItems: [],
+                _queuedItems: [] as any[],
                 _serializedTransformer: transformer,
                 _now: () => {}
             };
-            logger.persist = IDBLogger.prototype._persistItem.bind(logger);
-            const logItem = new LogItem("test", 1, logger);
+            (logger as any).persist = IDBLogger.prototype._persistItem.bind(logger);
+            const logItem = new LogItem("test", 1, logger as unknown as BaseLogger);
             logItem.error = new Error();
-            logItem.error.stack = "main http://localhost:3000/src/main.js:55\n<anonymous> http://localhost:3000/?loginToken=secret:26"
-            logger.persist(logItem, null, false);
+            logItem.error.stack = "main http://localhost:3000/src/main.js:55\n<anonymous> http://localhost:3000/?loginToken=secret:26";
+            (logger as any).persist(logItem, null, false);
             const item = logger._queuedItems.pop();
             console.log(item);
-            assert.strictEqual(item.json.search("secret"), -1);
+            assert.strictEqual(item?.json.search("secret"), -1);
         }
     };
 }

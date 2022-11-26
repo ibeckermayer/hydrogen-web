@@ -65,7 +65,7 @@ export class Client {
     private _platform: Platform;
     private _sessionStartedByReconnector: boolean;
     private _status: ObservableValue<LoadStatus>;
-    private _olmPromise: Promise<typeof window.Olm | null>
+    private _olmPromise: Promise<typeof window.Olm | undefined>
     private _workerPromise: Promise<OlmWorker | undefined>;
     private _error?: any;
     private _loginFailure?: LoginFailure;
@@ -103,7 +103,7 @@ export class Client {
         await this._platform.logger.run("load session", async log => {
             log.set("id", sessionId);
             try {
-                const sessionInfo: ISessionInfo = await this._platform.sessionInfoStorage.get(sessionId);
+                const sessionInfo = await this._platform.sessionInfoStorage.get(sessionId);
                 if (!sessionInfo) {
                     throw new Error("Invalid session id: " + sessionId);
                 }
@@ -515,8 +515,8 @@ export class Client {
             // if one fails, don't block the other from trying
             // also, run in parallel
             await Promise.all([
-                log?.wrap("storageFactory", () => this._platform.storageFactory.delete(this._sessionId)),
-                log?.wrap("sessionInfoStorage", () => this._platform.sessionInfoStorage.delete(this._sessionId)),
+                log?.wrap("storageFactory", () => this._platform.storageFactory.delete(this._sessionId!)),
+                log?.wrap("sessionInfoStorage", () => this._platform.sessionInfoStorage.delete(this._sessionId!)),
             ]);
             this._sessionId = undefined;
         }
