@@ -323,8 +323,8 @@ export class Client {
             if (state === ConnectionStatus.Online) {
                 this._platform.logger.runDetached("reconnect", async log => {
                     // needs to happen before sync and session or it would abort all requests
-                    this._requestScheduler?.start();
-                    this._sync?.start();
+                    this._requestScheduler!.start();
+                    this._sync!.start();
                     this._sessionStartedByReconnector = true;
                     const d = dehydratedDevice;
                     dehydratedDevice = undefined;
