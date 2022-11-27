@@ -125,7 +125,7 @@ export class HomeServerApi {
         return this._authedRequest("GET", this._url(csPath, options?.prefix || CS_R0_PREFIX), queryParams, body, options);
     }
 
-    sync(since: string, filter: string, timeout: number, options?: BaseRequestOptions): IHomeServerRequest<SyncResponse> {
+    sync(since: string | undefined, filter: number | undefined, timeout: number, options?: BaseRequestOptions): IHomeServerRequest<SyncResponse> {
         return this._get("/sync", {since, timeout, filter}, undefined, {prefix: CS_V3_PREFIX, ...options});
     }
 

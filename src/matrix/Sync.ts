@@ -118,7 +118,7 @@ export class Sync {
         void this._syncLoop(syncToken);
     }
 
-    async _syncLoop(syncToken: string): Promise<void> {
+    async _syncLoop(syncToken?: string): Promise<void> {
         // if syncToken is falsy, it will first do an initial sync ...
         while(this._status.get() !== SyncStatus.Stopped) {
             let roomStates: RoomSyncProcessState[];
@@ -207,7 +207,7 @@ export class Sync {
     }
 
     async _syncRequest(
-        syncToken: string,
+        syncToken: string | undefined,
         timeout: number,
         log: ILogItem
       ): Promise<{
@@ -297,7 +297,7 @@ export class Sync {
                 // if previously joined and we still have the timeline for it,
                 // this loads the syncWriter at the correct position to continue writing the timeline
                 if (rs.isNewRoom) {
-                    await rs.room.load(null, prepareTxn, log);
+                    await rs.room.load(undefined, prepareTxn, log);
                 }
                 return rs.room.prepareSync(
                     rs.roomResponse, rs.membership, newKeys, prepareTxn, log);
@@ -314,7 +314,7 @@ export class Sync {
         roomStates: RoomSyncProcessState[],
         archivedRoomStates: ArchivedRoomSyncProcessState[],
         response: SyncResponse,
-        syncFilterId: number,
+        syncFilterId: number | undefined,
         isInitialSync: boolean,
         log: ILogItem,
       ): Promise<void> {

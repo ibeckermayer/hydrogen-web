@@ -283,7 +283,7 @@ export class RoomViewModel extends ViewModel implements IGridItemViewModel {
        return {type: msgtype, message: message};
    }
 
-    async _sendMessage(message: string, replyingTo): Promise<boolean> {
+    async sendMessage(message: string, replyingTo): Promise<boolean> {
         if (!this._room.isArchived && message) {
             let messinfo: {type: string, message?: string} = {type : "m.text", message: message};
             if (message.startsWith("//")) {

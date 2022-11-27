@@ -64,7 +64,7 @@ import type {Options as RoomBeingCreatedOptions} from "./room/RoomBeingCreated"
 import type {SyncResponse} from "./net/types/sync";
 import type {ILock} from "../utils/Lock";
 import type {ArchivedRoomSyncProcessState, InviteSyncProcessState, RoomSyncProcessState} from "./Sync";
-import { Operation } from "./storage/idb/stores/OperationStore";
+import type {Operation} from "./storage/idb/stores/OperationStore";
 
 
 const PICKLE_KEY = "DEFAULT_KEY";
@@ -86,7 +86,7 @@ export class Session {
     private _storage: Storage;
     private _hsApi: HomeServerApi;
     private _mediaRepository: MediaRepository;
-    private _syncInfo?: any;
+    private _syncInfo?: SyncInfo;
     private _sessionInfo: SessionInfo;
     private _olm: typeof window.Olm | undefined;
     private _olmWorker?: OlmWorker;
@@ -701,14 +701,14 @@ export class Session {
         }
     }
 
-    async prepareSync(syncResponse: SyncResponse, lock: ILock | undefined, txn: Transaction, log: ILogItem) {
+    async prepareSync(syncResponse: SyncResponse, lock: ILock | undefined, txn: Transaction, log: ILogItem): Promise<SyncPreparation | undefined> {
         const toDeviceEvents = syncResponse.to_device?.events;
         if (Array.isArray(toDeviceEvents) && toDeviceEvents.length) {
             return await log.wrap("deviceMsgs", log => this._deviceMessageHandler.prepareSync(toDeviceEvents, lock, txn, log));
         }
     }
 
-    async writeSync(syncResponse: SyncResponse, syncFilterId: number, preparation: SyncPreparation | undefined, txn: Transaction, log: ILogItem): Promise<Changes> {
+    async writeSync(syncResponse: SyncResponse, syncFilterId: number | undefined, preparation: SyncPreparation | undefined, txn: Transaction, log: ILogItem): Promise<Changes> {
         const changes: Changes = {};
         const syncToken = syncResponse.next_batch;
         if (syncToken !== this.syncToken) {
@@ -843,12 +843,12 @@ export class Session {
     }
 
     /** @internal */
-    get syncToken(): any {
+    get syncToken(): string | undefined {
         return this._syncInfo?.token;
     }
 
     /** @internal */
-    get syncFilterId(): any {
+    get syncFilterId(): number | undefined {
         return this._syncInfo?.filterId;
     }
 
@@ -1069,7 +1069,7 @@ export function tests() {
     }
 }
 
-type SyncInfo = {token: string, filterId: number};
+type SyncInfo = {token: string, filterId?: number};
 
 export type Changes = {
     syncInfo?: SyncInfo,
