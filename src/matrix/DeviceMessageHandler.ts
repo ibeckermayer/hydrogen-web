@@ -17,23 +17,33 @@ limitations under the License.
 import {OLM_ALGORITHM} from "./e2ee/common";
 import {countBy, groupBy} from "../utils/groupBy";
 
+import type {Storage} from "./storage/idb/Storage";
+import {Decryption as OlmDecryption, DecryptionChanges as OlmDecryptionChanges} from "./e2ee/olm/Decryption";
+import {Decryption as MegOlmDecryption} from "./e2ee/megolm/Decryption";
+import { OlmEncryptedEvent } from "./e2ee/olm/types";
+import { ILogItem } from "../logging/types";
+import { ILock } from "../utils/Lock";
+import { Transaction } from "./storage/idb/Transaction";
+import { IncomingRoomKey } from "./e2ee/megolm/decryption/RoomKey";
+
 export class DeviceMessageHandler {
-    constructor({storage}) {
+    private _storage: Storage;
+    private _olmDecryption?: OlmDecryption;
+    private _megolmDecryption?: MegOlmDecryption;
+    constructor({storage}: {storage: Storage}) {
         this._storage = storage;
-        this._olmDecryption = null;
-        this._megolmDecryption = null;
     }
 
-    enableEncryption({olmDecryption, megolmDecryption}) {
-        this._olmDecryption = olmDecryption;
-        this._megolmDecryption = megolmDecryption;
+    enableEncryption(encryption: {olmDecryption: OlmDecryption, megolmDecryption: MegOlmDecryption}) {
+        this._olmDecryption = encryption.olmDecryption;
+        this._megolmDecryption = encryption.megolmDecryption;
     }
 
-    obtainSyncLock(toDeviceEvents) {
+    obtainSyncLock(toDeviceEvents: OlmEncryptedEvent[]): Promise<ILock> | undefined {
         return this._olmDecryption?.obtainDecryptionLock(toDeviceEvents);
     }
 
-    async prepareSync(toDeviceEvents, lock, txn, log) {
+    async prepareSync(toDeviceEvents: OlmEncryptedEvent[], lock: ILock | undefined, txn: Transaction, log: ILogItem): Promise<SyncPreparation | undefined> {
         log.set("messageTypes", countBy(toDeviceEvents, e => e.type));
         const encryptedEvents = toDeviceEvents.filter(e => e.type === "m.room.encrypted");
         if (!this._olmDecryption) {
@@ -43,6 +53,8 @@ export class DeviceMessageHandler {
         // only know olm for now
         const olmEvents = encryptedEvents.filter(e => e.content?.algorithm === OLM_ALGORITHM);
         if (olmEvents.length) {
+            if (!lock) throw new Error("attempted to decrypt without obtaining lock")
+            if (!this._megolmDecryption) throw new Error("attempted to decrypt messages before enabling encryption")
             const olmDecryptChanges = await this._olmDecryption.decryptAll(olmEvents, lock, txn);
             log.set("decryptedTypes", countBy(olmDecryptChanges.results, r => r.event?.type));
             for (const err of olmDecryptChanges.errors) {
@@ -54,16 +66,20 @@ export class DeviceMessageHandler {
     }
 
     /** check that prep is not undefined before calling this */
-    async writeSync(prep, txn) {
+    async writeSync(prep: SyncPreparation, txn: Transaction): Promise<boolean> {
         // write olm changes
         prep.olmDecryptChanges.write(txn);
-        const didWriteValues = await Promise.all(prep.newRoomKeys.map(key => this._megolmDecryption.writeRoomKey(key, txn)));
+        const didWriteValues = await Promise.all(prep.newRoomKeys.map(key => this._megolmDecryption?.writeRoomKey(key, txn)));
         return didWriteValues.some(didWrite => !!didWrite);
     }
 }
 
 export class SyncPreparation {
-    constructor(olmDecryptChanges, newRoomKeys) {
+    olmDecryptChanges: OlmDecryptionChanges;
+    newRoomKeys: IncomingRoomKey[];
+    newKeysByRoom: Map<string, IncomingRoomKey[]>;
+
+    constructor(olmDecryptChanges: OlmDecryptionChanges, newRoomKeys: IncomingRoomKey[]) {
         this.olmDecryptChanges = olmDecryptChanges;
         this.newRoomKeys = newRoomKeys;
         this.newKeysByRoom = groupBy(newRoomKeys, r => r.roomId);

@@ -65,6 +65,7 @@ import type {SyncResponse} from "./net/types/sync";
 import type {ILock} from "../utils/Lock";
 import type {ArchivedRoomSyncProcessState, InviteSyncProcessState, RoomSyncProcessState} from "./Sync";
 import type {Operation} from "./storage/idb/stores/OperationStore";
+import type {OlmEncryptedEvent} from "./e2ee/olm/types";
 
 
 const PICKLE_KEY = "DEFAULT_KEY";
@@ -697,14 +698,16 @@ export class Session {
     async obtainSyncLock(syncResponse: SyncResponse): Promise<ILock | undefined> {
         const toDeviceEvents = syncResponse.to_device?.events;
         if (Array.isArray(toDeviceEvents) && toDeviceEvents.length) {
-            return await this._deviceMessageHandler.obtainSyncLock(toDeviceEvents);
+             // TODO: are these actually guaranteed to be OlmEncryptedEvent, i.e. events with {type?: "m.room.encrypted"}
+            return await this._deviceMessageHandler.obtainSyncLock(toDeviceEvents as OlmEncryptedEvent[]);
         }
     }
 
     async prepareSync(syncResponse: SyncResponse, lock: ILock | undefined, txn: Transaction, log: ILogItem): Promise<SyncPreparation | undefined> {
         const toDeviceEvents = syncResponse.to_device?.events;
         if (Array.isArray(toDeviceEvents) && toDeviceEvents.length) {
-            return await log.wrap("deviceMsgs", log => this._deviceMessageHandler.prepareSync(toDeviceEvents, lock, txn, log));
+            // TODO: are these actually guaranteed to be OlmEncryptedEvent, i.e. events with {type?: "m.room.encrypted"}
+            return await log.wrap("deviceMsgs", log => this._deviceMessageHandler.prepareSync(toDeviceEvents as OlmEncryptedEvent[], lock, txn, log));
         }
     }
 
@@ -729,7 +732,7 @@ export class Session {
         }
 
         if (preparation) {
-            changes.hasNewRoomKeys = await log.wrap("deviceMsgs", log => this._deviceMessageHandler.writeSync(preparation, txn, log));
+            changes.hasNewRoomKeys = await log.wrap("deviceMsgs", log => this._deviceMessageHandler.writeSync(preparation, txn));
         }
 
         // store account data

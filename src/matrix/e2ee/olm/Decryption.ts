@@ -302,7 +302,7 @@ class SenderKeyDecryption {
  * @property {Array<DecryptionResult>} results
  * @property {Array<DecryptionError>} errors  see DecryptionError.event to retrieve the event that failed to decrypt.
  */
-class DecryptionChanges {
+export class DecryptionChanges {
     constructor(
         private readonly senderKeyDecryptions: SenderKeyDecryption[],
         public readonly results: DecryptionResult[],
