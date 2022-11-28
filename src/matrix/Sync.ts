@@ -17,8 +17,6 @@ limitations under the License.
 
 import {ObservableValue} from "../observable/ObservableValue";
 
-
-
 import type {Room, RoomSyncPreparation, RoomWriteSyncChanges} from "./room/Room";
 import type {LogItem} from "../logging/LogItem";
 import type {ILogger, ILogItem} from "../logging/types";
@@ -29,11 +27,7 @@ import type {Session, Changes} from "./Session";
 import type {Storage} from "./storage/idb/Storage";
 import type {ILock} from "../utils/Lock";
 import type {SyncPreparation} from "./DeviceMessageHandler";
-import type {EventKey} from "./room/timeline/EventKey";
-import type {MemberChange, MemberData} from "./room/members/RoomMember";
-import type {PendingEvent} from "./room/sending/PendingEvent";
-
-import type {HistoryVisibility, PowerLevelsStateEvent} from "./net/types/roomEvents";
+import type {MemberData} from "./room/members/RoomMember";
 import type {ArchivedRoom} from "./room/ArchivedRoom";
 import type {Invite} from "./room/Invite";
 import type {Transaction} from "./storage/idb/Transaction";
@@ -292,7 +286,7 @@ export class Sync {
         }
 
         await Promise.all(roomStates.map(async rs => {
-            const newKeys = newKeysByRoom?.get(rs.room.id);
+            const newKeys = newKeysByRoom?.get(rs.room.id) ?? [];
             rs.preparation = await log.wrap("room", async log => {
                 // if previously joined and we still have the timeline for it,
                 // this loads the syncWriter at the correct position to continue writing the timeline
