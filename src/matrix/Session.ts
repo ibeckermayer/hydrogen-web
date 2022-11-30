@@ -707,7 +707,7 @@ export class Session {
         const toDeviceEvents = syncResponse.to_device?.events;
         if (Array.isArray(toDeviceEvents) && toDeviceEvents.length) {
             // TODO: are these actually guaranteed to be OlmEncryptedEvent, i.e. events with {type?: "m.room.encrypted"}
-            return await log.wrap("deviceMsgs", log => this._deviceMessageHandler.prepareSync(toDeviceEvents as OlmEncryptedEvent[], lock, txn, log));
+            return await log.wrap("deviceMsgs", log => this._deviceMessageHandler.prepareSync(toDeviceEvents, lock, txn, log));
         }
     }
 

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type {Content} from "../../storage/types";
+
 /**
  * The response from the v3 sync/ endpoint.
  * See https://spec.matrix.org/v1.4/client-server-api/#get_matrixclientv3sync
@@ -142,10 +144,10 @@ type ToDevice = {
 };
 
 // Denoted "Event" in the spec
-type ToDeviceEvent = {
+export type ToDeviceEvent = {
   content?: EventContent;
   type?: string;
   sender?: string;
 };
 
-type EventContent = Object;
+type EventContent = Content;

@@ -18,13 +18,14 @@ import {OLM_ALGORITHM} from "./e2ee/common";
 import {countBy, groupBy} from "../utils/groupBy";
 
 import type {Storage} from "./storage/idb/Storage";
-import {Decryption as OlmDecryption, DecryptionChanges as OlmDecryptionChanges} from "./e2ee/olm/Decryption";
-import {Decryption as MegOlmDecryption} from "./e2ee/megolm/Decryption";
-import { OlmEncryptedEvent } from "./e2ee/olm/types";
-import { ILogItem } from "../logging/types";
-import { ILock } from "../utils/Lock";
-import { Transaction } from "./storage/idb/Transaction";
-import { IncomingRoomKey } from "./e2ee/megolm/decryption/RoomKey";
+import type {Decryption as OlmDecryption, DecryptionChanges as OlmDecryptionChanges} from "./e2ee/olm/Decryption";
+import type {Decryption as MegOlmDecryption} from "./e2ee/megolm/Decryption";
+import type {OlmEncryptedEvent} from "./e2ee/olm/types";
+import type {ILogItem} from "../logging/types";
+import type {ILock} from "../utils/Lock";
+import type {Transaction} from "./storage/idb/Transaction";
+import type {IncomingRoomKey} from "./e2ee/megolm/decryption/RoomKey";
+import type {ToDeviceEvent} from "./net/types/sync";
 
 export class DeviceMessageHandler {
     private _storage: Storage;
@@ -43,7 +44,7 @@ export class DeviceMessageHandler {
         return this._olmDecryption?.obtainDecryptionLock(toDeviceEvents);
     }
 
-    async prepareSync(toDeviceEvents: OlmEncryptedEvent[], lock: ILock | undefined, txn: Transaction, log: ILogItem): Promise<SyncPreparation | undefined> {
+    async prepareSync(toDeviceEvents: ToDeviceEvent[], lock: ILock | undefined, txn: Transaction, log: ILogItem): Promise<SyncPreparation | undefined> {
         log.set("messageTypes", countBy(toDeviceEvents, e => e.type));
         const encryptedEvents = toDeviceEvents.filter(e => e.type === "m.room.encrypted");
         if (!this._olmDecryption) {
@@ -51,7 +52,7 @@ export class DeviceMessageHandler {
             return;
         }
         // only know olm for now
-        const olmEvents = encryptedEvents.filter(e => e.content?.algorithm === OLM_ALGORITHM);
+        const olmEvents = encryptedEvents.filter(e => e.content?.algorithm === OLM_ALGORITHM) as OlmEncryptedEvent[];
         if (olmEvents.length) {
             if (!lock) throw new Error("attempted to decrypt without obtaining lock")
             if (!this._megolmDecryption) throw new Error("attempted to decrypt messages before enabling encryption")
