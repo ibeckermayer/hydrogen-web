@@ -24,7 +24,7 @@ import {Heroes} from "./members/Heroes";
 import {AttachmentUpload} from "./AttachmentUpload";
 import {DecryptionSource} from "../e2ee/common";
 import {PowerLevels} from "./PowerLevels";
-import {HistoryVisibility, PowerLevelsStateEvent, RoomEventType} from "../net/types/roomEvents";
+import {HistoryVisibility, Membership, PowerLevelsStateEvent, RoomEventType} from "../net/types/roomEvents";
 import type {Options as BaseRoomOptions} from './BaseRoom';
 import type {PendingEvent, PendingEventData} from "./sending/PendingEvent";
 import type {SortedArray} from "../../observable";
@@ -76,7 +76,7 @@ export class Room extends BaseRoom {
         return false;
     }
 
-    async prepareSync(roomResponse: JoinedRoom | LeftRoom, membership: string, newKeys: IncomingRoomKey[], txn: Transaction, log: ILogItem): Promise<RoomSyncPreparation> {
+    async prepareSync(roomResponse: JoinedRoom | LeftRoom, membership: Membership | undefined, newKeys: IncomingRoomKey[], txn: Transaction, log: ILogItem): Promise<RoomSyncPreparation> {
         log?.set("id", this.id);
         if (newKeys) {
             log?.set("newKeys", newKeys.length);

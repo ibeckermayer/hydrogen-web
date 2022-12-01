@@ -28,25 +28,25 @@ store contains:
 	joinCount
 */
 import {Store} from "../Store";
-import {SummaryData} from "../../../room/RoomSummary";
+import {SerializedSummaryData} from "../../../room/RoomSummary";
 
 /** Used for both roomSummary and archivedRoomSummary stores */
 export class RoomSummaryStore {
-    private _summaryStore: Store<SummaryData>;
+    private _summaryStore: Store<SerializedSummaryData>;
 
-    constructor(summaryStore: Store<SummaryData>) {
+    constructor(summaryStore: Store<SerializedSummaryData>) {
         this._summaryStore = summaryStore;
     }
 
-    getAll(): Promise<SummaryData[]> {
+    getAll(): Promise<SerializedSummaryData[]> {
         return this._summaryStore.selectAll();
     }
 
-    set(summary: SummaryData): void {
+    set(summary: SerializedSummaryData): void {
         this._summaryStore.put(summary);
     }
 
-    get(roomId: string): Promise<SummaryData | null> {
+    get(roomId: string): Promise<SerializedSummaryData | undefined> {
         return this._summaryStore.get(roomId);
     }
 

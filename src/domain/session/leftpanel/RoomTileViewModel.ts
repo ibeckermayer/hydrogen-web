@@ -71,7 +71,7 @@ export class RoomTileViewModel extends BaseTileViewModel {
             }
             return 1;
         }
-        const timeDiff = theirTimestamp - myTimestamp;
+        const timeDiff = (theirTimestamp ?? 0) - (myTimestamp ?? 0);
         if (timeDiff === 0 || !theirTimestampValid || !myTimestampValid) {
             // sort alphabetically
             const nameCmp = this.name.localeCompare(other.name);

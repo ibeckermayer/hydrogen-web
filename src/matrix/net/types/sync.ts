@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import type {Content} from "../../storage/types";
+import { RoomEventType } from "./roomEvents";
 
 /**
  * The response from the v3 sync/ endpoint.
@@ -35,8 +36,8 @@ type AccountData = {
 };
 
 // Denoted as simply "Event" in the spec
-type SyncEvent = {
-  content: Object;
+export type SyncEvent = {
+  content: Content;
   type: string;
 };
 
@@ -90,12 +91,12 @@ type State = {
 };
 
 export type ClientEventWithoutRoomID = {
-  content: Object;
+  content: Content;
   event_id: string;
   origin_server_ts: number;
   sender: string;
   state_key?: string;
-  type: string;
+  type: RoomEventType; // may be string
   unsigned?: UnsignedData;
 };
 
@@ -106,7 +107,7 @@ type UnsignedData = {
   transaction_id?: string;
 };
 
-type RoomSummary = {
+export type RoomSummary = {
   'm.heroes'?: string[];
   'm.invited_member_count'?: number;
   'm.joined_member_count'?: number;
@@ -118,7 +119,7 @@ export type Timeline = {
   prev_batch?: string;
 };
 
-type UnreadNotificationCounts = {
+export type UnreadNotificationCounts = {
   highlight_count?: number;
   notification_count?: number;
 };

@@ -204,7 +204,7 @@ export function tests() {
 
     let idCounter = 0;
 
-    function createMemberEvent(membership, userId, displayName, avatarUrl): StateEvent {
+    function createMemberEvent(membership, userId, displayName, avatarUrl): ClientEventWithoutRoomID {
         idCounter += 1;
         return {
             content: {
@@ -214,8 +214,8 @@ export function tests() {
             },
             event_id: `$${idCounter}`,
             sender: userId,
-            "state_key": userId,
-            type: "m.room.member",
+            state_key: userId,
+            type: RoomEventType.Member,
             origin_server_ts: 0,
         };
     }

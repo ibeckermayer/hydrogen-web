@@ -14,10 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type {RoomEventType} from "../net/types/roomEvents";
+
 export type Content = { [key: string]: any }
 
 // T can be a string literal denoting the specific type of an event, like "m.room.message".
-export type TimelineEvent<T extends string = string, C = Content, U = Content> = {
+export type TimelineEvent<T extends RoomEventType = RoomEventType, C = Content, U = Content> = {
     content: C;
     type: T;
     event_id: string;
@@ -28,7 +30,7 @@ export type TimelineEvent<T extends string = string, C = Content, U = Content> =
 
 // S can be a string literal denoting the state_key, most often it's ""
 export type StateEvent<
-    T extends string = string,
+    T extends RoomEventType = RoomEventType,
     C = Content,
     S extends string = string,
     U = Content

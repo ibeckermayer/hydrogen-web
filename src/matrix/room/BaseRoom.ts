@@ -58,11 +58,7 @@ export type Options = {
     mediaRepository: MediaRepository;
     emitCollectionChange: (room: BaseRoom, params: any) => boolean | undefined;
     user: User;
-    createRoomEncryption: (room: Room, encryptionParams: {
-        algorithm: "m.megolm.v1.aes-sha2";
-        rotation_period_ms?: number;
-        rotation_period_msgs?: number;
-    }) => RoomEncryption | null;
+    createRoomEncryption: (room: Room, encryptionParams: EncryptionParams) => RoomEncryption | null;
     getSyncToken: () => string | undefined;
     platform: Platform;
 }
@@ -74,11 +70,7 @@ export class BaseRoom extends EventEmitter<{change: void}> {
     private _mediaRepository: MediaRepository;
     private _emitCollectionChange: (room: BaseRoom, params?: any) => boolean | undefined;
     protected _user: User;
-    protected _createRoomEncryption: (room: BaseRoom, encryptionParams: {
-        algorithm: "m.megolm.v1.aes-sha2";
-        rotation_period_ms?: number;
-        rotation_period_msgs?: number;
-    }) => RoomEncryption | null;
+    protected _createRoomEncryption: (room: BaseRoom, encryptionParams: EncryptionParams) => RoomEncryption | null;
     private _getSyncToken: () => string | undefined;
     protected _platform: Platform;
     protected _summary: RoomSummary;
@@ -266,6 +258,7 @@ export class BaseRoom extends EventEmitter<{change: void}> {
             }
             // need to load members for name?
             if (this._summary.data.needsHeroes) {
+                if (!this._summary.data.heroes) throw new Error("data missing heroes")
                 this._heroes = new Heroes(this._roomId);
                 const changes = await this._heroes.calculateChanges(this._summary.data.heroes, new Map(), txn);
                 this._heroes.applyChanges(changes, this._summary.data, log);
@@ -447,7 +440,7 @@ export class BaseRoom extends EventEmitter<{change: void}> {
         return this._roomId;
     }
 
-    get lastMessageTimestamp(): number {
+    get lastMessageTimestamp(): number | undefined {
         return this._summary.data.lastMessageTimestamp;
     }
 
@@ -480,7 +473,7 @@ export class BaseRoom extends EventEmitter<{change: void}> {
         return this._mediaRepository;
     }
 
-    get membership(): Membership {
+    get membership(): Membership | undefined {
         return this._summary.data.membership;
     }
 
@@ -666,4 +659,10 @@ export class DecryptionRequest {
             this.preparation.dispose();
         }
     }
+}
+
+export type EncryptionParams = {
+    algorithm: "m.megolm.v1.aes-sha2";
+    rotation_period_ms?: number;
+    rotation_period_msgs?: number;
 }

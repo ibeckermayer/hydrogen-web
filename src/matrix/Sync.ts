@@ -31,6 +31,7 @@ import type {MemberData} from "./room/members/RoomMember";
 import type {ArchivedRoom} from "./room/ArchivedRoom";
 import type {Invite} from "./room/Invite";
 import type {Transaction} from "./storage/idb/Transaction";
+import { Membership } from "./net/types/roomEvents";
 
 const INCREMENTAL_TIMEOUT = 30000;
 
@@ -532,11 +533,11 @@ export class RoomSyncProcessState {
     room: Room;
     isNewRoom: boolean;
     roomResponse: JoinedRoom | LeftRoom;
-    membership: string;
+    membership?: Membership;
     preparation?: RoomSyncPreparation;
     changes?: RoomWriteSyncChanges;
 
-    constructor(room: Room, isNewRoom: boolean, roomResponse: JoinedRoom | LeftRoom, membership: string) {
+    constructor(room: Room, isNewRoom: boolean, roomResponse: JoinedRoom | LeftRoom, membership?: Membership) {
         this.room = room;
         this.isNewRoom = isNewRoom;
         this.roomResponse = roomResponse;

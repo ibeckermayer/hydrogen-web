@@ -491,7 +491,7 @@ export class Session {
         // load rooms
         const roomSummaries = await txn.roomSummary.getAll();
         const roomLoadPromise = Promise.all(roomSummaries.map(async summary => {
-            const room = this.createJoinedRoom(summary.roomId, pendingEventsByRoomId.get(summary.roomId));
+            const room = this.createJoinedRoom(summary.roomId!, pendingEventsByRoomId.get(summary.roomId!));
             await log.wrap("room", log => room.load(summary, txn, log));
             this._rooms?.add(room.id, room);
         }));
