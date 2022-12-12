@@ -177,10 +177,10 @@ export class SyncWriter {
         timelineEvents: ClientEventWithoutRoomID[],
         timeline: Timeline | undefined,
         memberSync: MemberSync,
-        currentKey: EventKey,
+        currentKey: EventKey | undefined,
         txn: Transaction,
         log: ILogItem
-    ): Promise<{ currentKey: EventKey; entries: EventEntry[]; updatedEntries: EventEntry[]; }> {
+    ): Promise<{ currentKey: EventKey | undefined; entries: EventEntry[]; updatedEntries: EventEntry[]; }> {
         const entries: EventEntry[] = [];
         const updatedEntries: EventEntry[] = [];
         if (timelineEvents?.length && timeline) {
@@ -222,22 +222,23 @@ export class SyncWriter {
     }
 
     async _handleRejoinOverlap(
-        timeline: { limited?: any; events?: any },
+        timeline: Timeline | undefined,
         txn: Transaction,
         log: ILogItem
-    ): Promise<{ limited?: any; events?: any }> {
+    ): Promise<Timeline> {
+        if (!timeline) throw new Error("expected timeline on rejoin")
         if (this._lastLiveKey) {
             const {fragmentId} = this._lastLiveKey;
             const [lastEvent] = await txn.timelineEvents.lastEvents(this._roomId, fragmentId, 1);
             if (lastEvent) {
                 const lastEventId = lastEvent.event.event_id;
                 const {events} = timeline;
-                const index = events.findIndex(event => event.event_id === lastEventId);
+                const index = events?.findIndex(event => event.event_id === lastEventId) ?? -1;
                 if (index !== -1) {
                     log.set("overlap_event_id", lastEventId);
                     return Object.assign({}, timeline, {
                         limited: false,
-                        events: events.slice(index + 1),
+                        events: events!.slice(index + 1),
                     });
                 }
             }
@@ -255,7 +256,7 @@ export class SyncWriter {
         // check for overlap with the last synced event
         log.set("isRejoin", isRejoin);
         if (isRejoin) {
-            timeline = await this._handleRejoinOverlap(timeline!, txn, log);
+            timeline = await this._handleRejoinOverlap(timeline, txn, log);
         }
         let timelineEvents: ClientEventWithoutRoomID[] = Array.isArray(timeline?.events) ? deduplicateEvents(timeline!.events) : [];
         const {state} = roomResponse;
@@ -265,12 +266,12 @@ export class SyncWriter {
             await this._writeStateEvents(stateEvents, txn, log);
         }
         const {currentKey, entries, updatedEntries} =
-            await this._writeTimeline(timelineEvents, timeline, memberSync, this._lastLiveKey!, txn, log);
+            await this._writeTimeline(timelineEvents, timeline, memberSync, this._lastLiveKey, txn, log);
         const memberChanges = await memberSync.write(txn);
         return {entries, updatedEntries, newLiveKey: currentKey, memberChanges};
     }
 
-    afterSync(newLiveKey: EventKey): void {
+    afterSync(newLiveKey: EventKey | undefined): void {
         this._lastLiveKey = newLiveKey;
     }
 
@@ -282,7 +283,7 @@ export class SyncWriter {
 export type SyncWriterResult = {
     entries: EventEntry[];
     updatedEntries: EventEntry[];
-    newLiveKey: EventKey;
+    newLiveKey?: EventKey;
     memberChanges: Map<string, MemberChange>;
 };
 

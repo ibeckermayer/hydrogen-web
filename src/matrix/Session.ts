@@ -66,6 +66,7 @@ import type {ILock} from "../utils/Lock";
 import type {ArchivedRoomSyncProcessState, InviteSyncProcessState, RoomSyncProcessState} from "./Sync";
 import type {Operation} from "./storage/idb/stores/OperationStore";
 import type {OlmEncryptedEvent} from "./e2ee/olm/types";
+import { Space } from "./room/Space";
 
 
 const PICKLE_KEY = "DEFAULT_KEY";
@@ -95,6 +96,7 @@ export class Session {
     private _user: User;
     private _deviceMessageHandler: DeviceMessageHandler;
     private _rooms?: ObservableMap<string, Room>;
+    private _spaces?: ObservableMap<string, Space>;
     private _invites: ObservableMap<string, Invite>;
     private _roomsBeingCreated: ObservableMap<string, RoomBeingCreated>;
     private _activeArchivedRooms: Map<string, ArchivedRoom>;
@@ -122,6 +124,7 @@ export class Session {
         this._roomUpdateCallback = (room, params) => this._rooms?.update(room.id, params);
         this._activeArchivedRooms = new Map();
         this._invites = new ObservableMap();
+        this._spaces = new ObservableMap();
         this._inviteUpdateCallback = (invite, params) => this._invites.update(invite.id, params);
         this._roomsBeingCreatedUpdateCallback = (rbc, params) => {
             if (rbc.isCancelled) {
@@ -323,10 +326,19 @@ export class Session {
             throw err;
         }
         await writeTxn.complete();
-        if (this._keyBackup.get() && this._rooms) {
-            for (const [_, room] of this._rooms) {
-                if (room.isEncrypted) {
-                    room.enableKeyBackup(undefined);
+        if (this._keyBackup.get() && (this._rooms || this._spaces)) {
+            if (this._rooms) {
+                for (const [_, room] of this._rooms) {
+                    if (room.isEncrypted) {
+                        room.enableKeyBackup(undefined);
+                    }
+                }
+            }
+            if (this._spaces) {
+                for (const [_, space] of this._spaces) {
+                    if (space.isEncrypted) {
+                        space.enableKeyBackup(undefined);
+                    }
                 }
             }
             this._keyBackup.get()?.dispose();
@@ -348,10 +360,21 @@ export class Session {
                     this._storage,
                     txn
                 );
-                if (keyBackup && this._rooms) {
-                    for (const [_, room] of this._rooms) {
-                        if (room.isEncrypted) {
-                            room.enableKeyBackup(keyBackup);
+                if (keyBackup && (this._rooms || this._spaces)) {
+                    if (this._rooms)
+                    {
+                        for (const [_, room] of this._rooms) {
+                            if (room.isEncrypted) {
+                                room.enableKeyBackup(keyBackup);
+                            }
+                        }
+                    }
+                    if (this._spaces)
+                    {
+                        for (const [_, space] of this._spaces) {
+                            if (space.isEncrypted) {
+                                space.enableKeyBackup(keyBackup);
+                            }
                         }
                     }
                     this._keyBackup.set(keyBackup);
@@ -491,9 +514,15 @@ export class Session {
         // load rooms
         const roomSummaries = await txn.roomSummary.getAll();
         const roomLoadPromise = Promise.all(roomSummaries.map(async summary => {
-            const room = this.createJoinedRoom(summary.roomId!, pendingEventsByRoomId.get(summary.roomId!));
-            await log.wrap("room", log => room.load(summary, txn, log));
-            this._rooms?.add(room.id, room);
+            if (!summary.isSpace) {
+                const room = this.createJoinedRoom(summary.roomId!, pendingEventsByRoomId.get(summary.roomId!));
+                await log.wrap("room", log => room.load(summary, txn, log));
+                this._rooms?.add(room.id, room);
+            } else {
+                const space = this.createJoinedSpace(summary.roomId!, pendingEventsByRoomId.get(summary.roomId!));
+                await log.wrap("space", log => space.load(summary, txn, log));
+                this._spaces?.add(space.id, space);
+            }
         }));
         // load invites and rooms in parallel
         await Promise.all([inviteLoadPromise, roomLoadPromise]);
@@ -514,6 +543,12 @@ export class Session {
             }
         }
         this._rooms = undefined;
+        if (this._spaces) {
+            for (const [_, room] of this._spaces) {
+                room.dispose();
+            }
+        }
+        this._spaces = undefined;
     }
 
     /**
@@ -578,6 +613,16 @@ export class Session {
                 room.start(roomOperationsByType, log);
             }
         }
+        if (this._spaces) {
+            for (const [_, space] of this._spaces) {
+                let spaceOperationsByType: Map<string, Operation[]> | undefined;
+                const spaceOperations = operationsByScope.get(space.id);
+                if (spaceOperations) {
+                    spaceOperationsByType = groupBy(spaceOperations, r => r.type);
+                }
+                space.start(spaceOperationsByType, log);
+            }
+        }
     }
 
     async _getPendingEventsByRoom(txn: Transaction): Promise<Map<string, [PendingEntry]>> {
@@ -598,6 +643,11 @@ export class Session {
         return this._rooms;
     }
 
+    get spaces(): ObservableMap<string, Space> {
+        if (!this._spaces) throw new Error("session is missing spaces")
+        return this._spaces;
+    }
+
     findDirectMessageForUserId(userId: string): Room | Invite | undefined {
         if (this._rooms) {
             for (const [_ ,room] of this._rooms) {
@@ -616,6 +666,22 @@ export class Session {
     /** @internal */
     createJoinedRoom(roomId: string, pendingEvents?: PendingEventData[]): Room {
         return new Room({
+            roomId,
+            getSyncToken: this._getSyncToken,
+            storage: this._storage,
+            emitCollectionChange: this._roomUpdateCallback,
+            hsApi: this._hsApi,
+            mediaRepository: this._mediaRepository,
+            pendingEvents,
+            user: this._user,
+            createRoomEncryption: this._createRoomEncryption,
+            platform: this._platform
+        });
+    }
+
+    /** @internal */
+    createJoinedSpace(roomId: string, pendingEvents?: PendingEventData[]): Space {
+        return new Space({
             roomId,
             getSyncToken: this._getSyncToken,
             storage: this._storage,
@@ -792,14 +858,29 @@ export class Session {
         }
     }
 
-    applyRoomCollectionChangesAfterSync(inviteStates: InviteSyncProcessState[], roomStates: RoomSyncProcessState[], archivedRoomStates: ArchivedRoomSyncProcessState[], log: ILogItem) {
+    applyRoomCollectionChangesAfterSync(
+        inviteStates: InviteSyncProcessState[],
+        roomStates: RoomSyncProcessState[],
+        spaceStates: RoomSyncProcessState[],
+        archivedRoomStates: ArchivedRoomSyncProcessState[],
+        log: ILogItem
+    ) {
         // update the collections after sync
         for (const rs of roomStates) {
             if (rs.shouldAdd) {
-                this._rooms?.add(rs.id, rs.room);
+                this._rooms?.add(rs.id, rs.object);
                 this._tryReplaceRoomBeingCreated(rs.id, log);
             } else if (rs.shouldRemove) {
                 this._rooms?.remove(rs.id);
+            }
+        }
+        // update the collections after sync
+        for (const ss of spaceStates) {
+            if (ss.shouldAdd) {
+                this._spaces?.add(ss.id, ss.object);
+                this._tryReplaceRoomBeingCreated(ss.id, log);
+            } else if (ss.shouldRemove) {
+                this._rooms?.remove(ss.id);
             }
         }
         for (const is of inviteStates) {

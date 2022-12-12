@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import {EventEmitter} from "../../utils/EventEmitter";
-import {RoomSummary} from "./RoomSummary";
+import {RoomSummary, SerializedSummaryData, SummaryData} from "./RoomSummary";
 import {GapWriter} from "./timeline/persistence/GapWriter";
 import {RelationWriter} from "./timeline/persistence/RelationWriter";
 import {Timeline} from "./timeline/Timeline";
@@ -37,7 +37,7 @@ import type {Storage} from "../storage/idb/Storage";
 import type {HomeServerApi} from "../net/HomeServerApi";
 import type {MediaRepository} from "../net/MediaRepository";
 import type {Room} from "./Room";
-import type {RoomEncryption, SummaryData} from "../e2ee/RoomEncryption";
+import type {RoomEncryption} from "../e2ee/RoomEncryption";
 import type {User} from "../User";
 import type {RoomMember} from "./members/RoomMember";
 import type {Transaction} from "../storage/idb/Transaction";
@@ -53,6 +53,7 @@ const EVENT_ENCRYPTED_TYPE = "m.room.encrypted";
 
 export type Options = {
     roomId: string;
+    isSpace?: boolean;
     storage: Storage;
     hsApi: HomeServerApi;
     mediaRepository: MediaRepository;
@@ -86,13 +87,13 @@ export class BaseRoom extends EventEmitter<{change: void}> {
     protected _heroes?: Heroes;
 
 
-    constructor({roomId, storage, hsApi, mediaRepository, emitCollectionChange, user, createRoomEncryption, getSyncToken, platform}: Options) {
+    constructor({roomId, isSpace, storage, hsApi, mediaRepository, emitCollectionChange, user, createRoomEncryption, getSyncToken, platform}: Options) {
         super();
         this._roomId = roomId;
         this._storage = storage;
         this._hsApi = hsApi;
         this._mediaRepository = mediaRepository;
-        this._summary = new RoomSummary(roomId);
+        this._summary = new RoomSummary(roomId, isSpace);
         this._fragmentIdComparer = new FragmentIdComparer([]);
         this._emitCollectionChange = emitCollectionChange;
         this._user = user;
@@ -245,7 +246,7 @@ export class BaseRoom extends EventEmitter<{change: void}> {
     }
 
     /** @package */
-    async load(summary: SummaryData | undefined, txn: Transaction, log: ILogItem) {
+    async load(summary: SerializedSummaryData | undefined, txn: Transaction, log: ILogItem) {
         log?.set("id", this.id);
         try {
             // if called from sync, there is no summary yet

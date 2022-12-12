@@ -17,20 +17,20 @@ limitations under the License.
 import { EventKey } from "../EventKey";
 import type { Direction } from "../Direction";
 
-type EventEnry = {
+type EventEntry<T = any> = {
     fragmentId: number;
     eventIndex: number;
     roomId: string;
-    event: any;
+    event: T;
     displayName?: string;
     avatarUrl?: string;
 };
 
-export function createEventEntry(
+export function createEventEntry<T = any>(
     key: EventKey,
     roomId: string,
-    event: any
-): EventEnry {
+    event: T,
+): EventEntry<T> {
     return {
         fragmentId: key.fragmentId,
         eventIndex: key.eventIndex,

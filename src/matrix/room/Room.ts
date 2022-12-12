@@ -28,7 +28,7 @@ import {HistoryVisibility, Membership, PowerLevelsStateEvent, RoomEventType} fro
 import type {Options as BaseRoomOptions} from './BaseRoom';
 import type {PendingEvent, PendingEventData} from "./sending/PendingEvent";
 import type {SortedArray} from "../../observable";
-import type {RoomEncryption, SummaryData, DecryptionPreparation, BatchDecryptionResult} from "../e2ee/RoomEncryption";
+import type {RoomEncryption, DecryptionPreparation, BatchDecryptionResult} from "../e2ee/RoomEncryption";
 import type {EventEntry} from "./timeline/entries/EventEntry";
 import type {EventKey} from "./timeline/EventKey";
 import type {MemberChange} from "./members/RoomMember";
@@ -40,9 +40,10 @@ import { IncomingRoomKey } from "../e2ee/megolm/decryption/RoomKey";
 import { DecryptionChanges } from "../e2ee/megolm/decryption/DecryptionChanges";
 import { Operation } from "../storage/idb/stores/OperationStore";
 import { TimelineEvent, Content } from "../storage/types";
+import { SerializedSummaryData, SummaryData } from "./RoomSummary";
 
 
-type Options = {
+export type Options = {
     pendingEvents?: PendingEventData[];
 } & BaseRoomOptions;
 
@@ -89,7 +90,7 @@ export class Room extends BaseRoom {
             roomEncryption = this._createRoomEncryption(this, summaryChanges.encryption);
         }
 
-        let retryEntries;
+        let retryEntries: EventEntry[] | undefined;
         let decryptPreparation;
         if (roomEncryption) {
             let eventsToDecrypt = roomResponse?.timeline?.events || [];
@@ -100,7 +101,7 @@ export class Room extends BaseRoom {
                 // to happen if a key is not needed to decrypt this sync or there are indeed no encrypted messages
                 // in this sync at all.
                 retryEntries = await this._getSyncRetryDecryptEntries(newKeys, roomEncryption, txn);
-                if (retryEntries.length) {
+                if (retryEntries && retryEntries.length) {
                     log?.set("retry", retryEntries.length);
                     eventsToDecrypt = eventsToDecrypt.concat(retryEntries.map(entry => entry.event));
                 }
@@ -118,7 +119,7 @@ export class Room extends BaseRoom {
             roomEncryption,
             summaryChanges,
             decryptPreparation,
-            retryEntries
+            retryEntries,
         };
     }
 
@@ -136,7 +137,7 @@ export class Room extends BaseRoom {
      * @package
      */
      async writeSync(
-        roomResponse: LeftRoom,
+        roomResponse: LeftRoom | JoinedRoom,
         isInitialSync: boolean,
         {
             summaryChanges,
@@ -148,7 +149,7 @@ export class Room extends BaseRoom {
         log: ILogItem
     ): Promise<RoomWriteSyncChanges> {
         log.set("id", this.id);
-        const isRejoin = summaryChanges.isNewJoin(this._summary.data);
+        const isRejoin = summaryChanges?.isNewJoin(this._summary.data) || false;
         if (isRejoin) {
             // remove all room state before calling syncWriter,
             // so no old state sticks around
@@ -157,7 +158,7 @@ export class Room extends BaseRoom {
         }
         const {entries: newEntries, updatedEntries, newLiveKey, memberChanges} =
             await log.wrap("syncWriter", log => this._syncWriter.writeSync(
-                roomResponse, isRejoin, summaryChanges.hasFetchedMembers, txn, log), log?.level.Detail);
+                roomResponse, isRejoin, summaryChanges?.hasFetchedMembers || false, txn, log), log?.level.Detail);
         let decryption: BatchDecryptionResult | undefined;
         if (decryptChanges) {
             decryption = await log?.wrap("decryptChanges", () => decryptChanges.write(txn));
@@ -182,11 +183,11 @@ export class Room extends BaseRoom {
         }
         const allEntries = newEntries.concat(updatedEntries);
         // also apply (decrypted) timeline entries to the summary changes
-        summaryChanges = summaryChanges.applyTimelineEntries(
+        summaryChanges = summaryChanges?.applyTimelineEntries(
             allEntries, isInitialSync, !this._isTimelineOpen, this._user.id);
 
         // if we've have left the room, remove the summary
-        if (summaryChanges.membership !== "join") {
+        if (summaryChanges?.membership !== "join") {
             txn.roomSummary.remove(this.id);
         } else {
             // write summary changes, and unset if nothing was actually changed
@@ -206,7 +207,7 @@ export class Room extends BaseRoom {
             if (!this._heroes) {
                 this._heroes = new Heroes(this._roomId);
             }
-            heroChanges = await this._heroes.calculateChanges(summaryChanges.heroes, memberChanges, txn);
+            heroChanges = await this._heroes.calculateChanges(summaryChanges?.heroes || [], memberChanges, txn);
         }
         let removedPendingEvents: PendingEvent[] | undefined;
         if (Array.isArray(roomResponse.timeline?.events)) {
@@ -377,7 +378,7 @@ export class Room extends BaseRoom {
     }
 
     /** @package */
-    async load(summary: SummaryData | undefined, txn: Transaction, log: ILogItem) {
+    async load(summary: SerializedSummaryData | undefined, txn: Transaction, log: ILogItem) {
         try {
             await super.load(summary, txn, log);
             await this._syncWriter.load(txn, log);
@@ -521,10 +522,10 @@ export class Room extends BaseRoom {
 
 export type RoomSyncPreparation = {
     roomEncryption: RoomEncryption;
-    summaryChanges: SummaryData;
+    summaryChanges?: SummaryData;
     decryptPreparation: DecryptionPreparation;
     decryptChanges?: DecryptionChanges;
-    retryEntries: EventEntry[];
+    retryEntries?: EventEntry[];
 }
 
 export type RoomEncryptionWriteSyncChanges = {
@@ -533,11 +534,11 @@ export type RoomEncryptionWriteSyncChanges = {
 }
 
 export type RoomWriteSyncChanges = {
-    summaryChanges: SummaryData;
+    summaryChanges?: SummaryData;
     roomEncryption: RoomEncryption;
     newEntries: EventEntry[];
     updatedEntries: EventEntry[];
-    newLiveKey: EventKey;
+    newLiveKey?: EventKey;
     memberChanges: Map<string, MemberChange>;
     removedPendingEvents?: PendingEvent[];
     heroChanges?: HeroChanges;

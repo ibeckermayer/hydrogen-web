@@ -216,6 +216,7 @@ export type SerializedSummaryData = {
     tags?: Content;
     isDirectMessage: boolean;
     dmUserId?: string;
+    isSpace: boolean;
 }
 
 export class SummaryData {
@@ -238,27 +239,29 @@ export class SummaryData {
     isDirectMessage: boolean;
     dmUserId?: string;
     cloned?: boolean;
+    isSpace: boolean;
 
-    constructor(copy?: SummaryData, roomId?: string) {
-        this.roomId = copy?.roomId ?? roomId;
+    constructor(copy?: SummaryData | SerializedSummaryData, roomId?: string, isSpace?: boolean) {
+        this.roomId = copy?.roomId || roomId;
         this.name = copy?.name;
         this.lastMessageTimestamp = copy?.lastMessageTimestamp;
         this.isUnread = copy ? copy.isUnread : false;
         this.encryption = copy?.encryption;
         this.membership = copy?.membership;
-        this.inviteCount = copy?.inviteCount ?? 0;
-        this.joinCount = copy?.joinCount ?? 0;
+        this.inviteCount = copy?.inviteCount || 0;
+        this.joinCount = copy?.joinCount || 0;
         this.heroes = copy?.heroes;
         this.canonicalAlias = copy?.canonicalAlias;
-        this.hasFetchedMembers = copy?.hasFetchedMembers ?? false;
-        this.isTrackingMembers = copy?.isTrackingMembers ?? false;
+        this.hasFetchedMembers = copy?.hasFetchedMembers || false;
+        this.isTrackingMembers = copy?.isTrackingMembers || false;
         this.avatarUrl = copy?.avatarUrl;
-        this.notificationCount = copy?.notificationCount ?? 0;
-        this.highlightCount = copy?.highlightCount ?? 0;
+        this.notificationCount = copy?.notificationCount || 0;
+        this.highlightCount = copy?.highlightCount || 0;
         this.tags = copy?.tags;
-        this.isDirectMessage = copy?.isDirectMessage ?? false;
+        this.isDirectMessage = copy?.isDirectMessage || false;
         this.dmUserId = copy?.dmUserId;
         this.cloned = copy ? true : false;
+        this.isSpace = copy ? copy.isSpace : isSpace ?? false;
     }
 
     changedKeys(other: { [x: string]: any; }): string[] {
@@ -305,8 +308,8 @@ export class SummaryData {
 export class RoomSummary {
     private _data: SummaryData;
 
-	constructor(roomId: string) {
-        this.applyChanges(new SummaryData(undefined, roomId));
+	constructor(roomId: string, isSpace?: boolean) {
+        this.applyChanges(new SummaryData(undefined, roomId, isSpace));
 	}
 
     get data(): SummaryData {
@@ -376,7 +379,7 @@ export class RoomSummary {
         this._data.cloned = false;
     }
 
-	async load(summary: SummaryData) {
+	async load(summary: SummaryData | SerializedSummaryData) {
         this.applyChanges(new SummaryData(summary));
 	}
 }

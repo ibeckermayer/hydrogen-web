@@ -104,7 +104,6 @@ export class MemberSync {
         return members;
     }
 
-    // TODO: timelineEvents: TimelineEvent[] seems like it would make more sense but TimelineEvent doesn't have state_key
     _timelineEventsToMembers(timelineEvents: ClientEventWithoutRoomID[]): Map<string, RoomMember> | undefined {
         let members: Map<string, RoomMember> | undefined;
         // iterate backwards to only add the last member in the timeline
