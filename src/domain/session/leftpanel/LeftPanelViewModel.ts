@@ -31,7 +31,7 @@ import { Session } from "../../../matrix/Session";
 import { SegmentType } from "../../navigation";
 import type { Path } from "../../navigation/Navigation";
 
-type LOptions = { session: Session } & ViewModelOptions;
+type Options = { session: Session } & ViewModelOptions;
 
 export class LeftPanelViewModel extends ViewModel<
     SegmentType,
@@ -51,7 +51,7 @@ export class LeftPanelViewModel extends ViewModel<
         this.urlRouter.urlForSegment("create-room");
     gridEnabled: boolean;
 
-    constructor(options: LOptions) {
+    constructor(options: Options) {
         super(options);
         const { session } = options;
         this._tileViewModelsMap = this._mapTileViewModels(
