@@ -33,6 +33,7 @@ import type {Invite} from "./room/Invite";
 import type {Transaction} from "./storage/idb/Transaction";
 import { Membership, RoomEventType } from "./net/types/roomEvents";
 import { isSpaceCreateEvent, Space } from "./room/Space";
+import { IncomingRoomKey } from "./e2ee/megolm/decryption/RoomKey";
 
 const INCREMENTAL_TIMEOUT = 30000;
 
@@ -308,27 +309,25 @@ export class Sync {
 
         await Promise.all(roomStates.map(async rs => {
             const newKeys = newKeysByRoom?.get(rs.object.id) ?? [];
-            rs.preparation = await log.wrap("room", async log => {
+            log.wrap("room", async log => {
                 // if previously joined and we still have the timeline for it,
                 // this loads the syncWriter at the correct position to continue writing the timeline
                 if (rs.isNewRoom) {
                     await rs.object.load(undefined, prepareTxn, log);
                 }
-                return rs.object.prepareSync(
-                    rs.roomResponse, rs.membership, newKeys, prepareTxn, log);
+                await rs.prepareSync(newKeys, prepareTxn, log);
             }, log.level.Detail);
         }));
 
         await Promise.all(spaceStates.map(async ss => {
             const newKeys = newKeysByRoom?.get(ss.object.id) ?? [];
-            ss.preparation = await log.wrap("room", async log => {
+            log.wrap("space", async log => {
                 // if previously joined and we still have the timeline for it,
                 // this loads the syncWriter at the correct position to continue writing the timeline
                 if (ss.isNewRoom) {
                     await ss.object.load(undefined, prepareTxn, log);
                 }
-                return ss.object.prepareSync(
-                    ss.roomResponse, ss.membership, newKeys, prepareTxn, log);
+                await ss.prepareSync(newKeys, prepareTxn, log);
             }, log.level.Detail);
         }));
 
@@ -356,12 +355,10 @@ export class Sync {
                     is.membership, is.roomResponse, syncTxn, log));
             }));
             await Promise.all(roomStates.map(async rs => {
-                rs.changes = await log.wrap("room", log => rs.object.writeSync(
-                    rs.roomResponse, isInitialSync, rs.preparation!, syncTxn, log));
+                await log.wrap("room", log => rs.writeSync(isInitialSync, syncTxn, log));
             }));
             await Promise.all(spaceStates.map(async ss => {
-                ss.changes = await log.wrap("space", log => ss.object.writeSync(
-                    ss.roomResponse, isInitialSync, ss.preparation!, syncTxn, log));
+                await log.wrap("space", log => ss.writeSync(isInitialSync, syncTxn, log));
             }))
             // important to do this after roomStates,
             // as we're referring to the roomState to get the summaryChanges
@@ -468,7 +465,7 @@ export class Sync {
                             inviteStates.push(new InviteSyncProcessState(invite, false, undefined, membership));
                         }
                         if (this._isSpaceResponse(roomId, roomResponse)) {
-                            const spaceState = this._createSpaceSyncState(roomId, roomResponse, membership)
+                            const spaceState = this._createSpaceSyncState(roomId, roomResponse, membership, isInitialSync)
                             if (spaceState) {
                                 spaceStates.push(spaceState)
                             }
@@ -514,9 +511,11 @@ export class Sync {
         }
     }
 
-    // Returns whether the roomResponse is for a space or not based on whether
-    // we have a spaces entry for it in the database, or, if it's a new space,
-    // whether it has the characteristic "m.space" type.
+    /**
+     * Returns whether the roomResponse is for a space or not based on whether
+     * we have a spaces entry for it in the database, or, if it's a new space,
+     * whether it has the characteristic "m.space" type.
+     */
     _isSpaceResponse(roomId: string, roomResponse: JoinedRoom | LeftRoom): boolean {
         if (this._session.spaces?.get(roomId) !== undefined) {
             return true
@@ -529,14 +528,13 @@ export class Sync {
         return false
     }
 
-    _createSpaceSyncState(roomId: string, roomResponse: JoinedRoom | LeftRoom, membership: "join" | "leave"): SpaceSyncProcessState | undefined {
+    _createSpaceSyncState(roomId: string, roomResponse: JoinedRoom | LeftRoom, membership: "join" | "leave", isInitialSync: boolean): SpaceSyncProcessState | undefined {
         let isNewSpace = false;
         let space = this._session.spaces?.get(roomId);
-        if (!space && membership === "join") {
+        if (!space && (membership === "join" || (isInitialSync && membership === "leave"))) {
             space = this._session.createJoinedSpace(roomId);
             isNewSpace = true
         }
-        // if (membership === "leave") throw new Error("unhandled case") //todo(isaiah)
         if (space) {
             return new SpaceSyncProcessState(space, isNewSpace, roomResponse, membership)
         }
@@ -614,12 +612,20 @@ class SessionSyncProcessState {
     }
 }
 
-class BaseRoomOrSpaceSyncProcessState<T extends Room | Space> {
+abstract class BaseRoomOrSpaceSyncProcessState<T extends Room | Space> {
     object: T;
     isNewRoom: boolean;
     roomResponse: JoinedRoom | LeftRoom;
     membership?: Membership;
+
+    /**
+     * Object state, created by calling prepareSync
+     */
     preparation?: RoomSyncPreparation;
+
+    /**
+     * Object state, created by calling writeSync
+     */
     changes?: RoomWriteSyncChanges;
 
     constructor(object: T, isNewRoom: boolean, roomResponse: JoinedRoom | LeftRoom, membership?: Membership) {
@@ -627,6 +633,18 @@ class BaseRoomOrSpaceSyncProcessState<T extends Room | Space> {
         this.isNewRoom = isNewRoom;
         this.roomResponse = roomResponse;
         this.membership = membership;
+    }
+
+    async prepareSync(newKeys: IncomingRoomKey[], txn: Transaction, log: ILogItem) {
+        this.preparation = await this.object.prepareSync(this.roomResponse, this.membership, newKeys, txn, log);
+    }
+
+    async writeSync(isInitialSync: boolean, txn: Transaction, log: ILogItem
+    ) {
+        if (!this.preparation) {
+            throw new Error("cannot writeSync before prepareSync")
+        }
+        this.changes = await this.object.writeSync(this.roomResponse, isInitialSync, this.preparation, txn, log);
     }
 
     get id() {
