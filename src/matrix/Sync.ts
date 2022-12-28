@@ -356,18 +356,18 @@ export class Sync {
       ): Promise<void> {
         const syncTxn = await this._openSyncTxn();
         try {
-            sessionState.changes = await log.wrap("session", log => this._session.writeSync(
-                response, syncFilterId, sessionState.preparation, syncTxn, log));
-            await log.wrap("session", log => sessionState.writeSync(response, syncFilterId, syncTxn, log));
-            await Promise.all(inviteStates.map(async is => {
-                log.wrap("invite", log => is.writeSync(syncTxn, log));
-            }));
-            await Promise.all(roomStates.map(async rs => {
-                await log.wrap("room", log => rs.writeSync(isInitialSync, syncTxn, log));
-            }));
-            await Promise.all(spaceStates.map(async ss => {
-                await log.wrap("space", log => ss.writeSync(isInitialSync, syncTxn, log));
-            }))
+            await Promise.all([
+                log.wrap("session", log => sessionState.writeSync(response, syncFilterId, syncTxn, log)),
+                Promise.all(inviteStates.map(async is => {
+                    await log.wrap("invite", log => is.writeSync(syncTxn, log));
+                })),
+                Promise.all(roomStates.map(async rs => {
+                    await log.wrap("room", log => rs.writeSync(isInitialSync, syncTxn, log));
+                })),
+                Promise.all(spaceStates.map(async ss => {
+                    await log.wrap("space", log => ss.writeSync(isInitialSync, syncTxn, log));
+                }))
+            ])
             // important to do this after roomStates,
             // as we're referring to the roomState to get the summaryChanges
             await Promise.all(archivedRoomStates.map(async ars => {
