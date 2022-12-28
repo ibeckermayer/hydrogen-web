@@ -246,9 +246,7 @@ export class Sync {
             // take a lock on olm sessions used in this sync so sending a message doesn't change them while syncing
             await log.wrap("obtainSyncLock", () => sessionState.obtainSyncLock(response));
             await log.wrap("prepare", log => this._prepareSync(sessionState, roomStates, spaceStates, response, log));
-            await log.wrap("afterPrepareSync", log => Promise.all(roomStates.map(rs => {
-                return rs.object.afterPrepareSync(rs.preparation, log);
-            })));
+            await log.wrap("afterPrepareSync", log => this._afterPrepareSync(roomStates, spaceStates, log));
             await log.wrap("write", async log => this._writeSync(
                     sessionState, inviteStates, roomStates, spaceStates,
                     archivedRoomStates, response, syncFilterId, isInitialSync, log));
@@ -334,6 +332,17 @@ export class Sync {
         await prepareTxn.complete();
     }
 
+    _afterPrepareSync(roomStates: RoomSyncProcessState[], spaceStates: SpaceSyncProcessState[], log: ILogItem) {
+        return Promise.all([
+            Promise.all(roomStates.map(rs => {
+                return rs.afterPrepareSync(log);
+            })),
+            Promise.all(spaceStates.map(rs => {
+                return rs.afterPrepareSync(log);
+            }))
+        ]);
+    }
+
     async _writeSync(
         sessionState: SessionSyncProcessState,
         inviteStates: InviteSyncProcessState[],
@@ -382,23 +391,19 @@ export class Sync {
         archivedRoomStates: ArchivedRoomSyncProcessState[],
         log: ILogItem
       ): void {
-        log.wrap("session", log => this._session.afterSync(sessionState.changes), log.level.Detail);
+        log.wrap("session", log => sessionState.afterSync(), log.level.Detail);
         for(let ars of archivedRoomStates) {
-            log.wrap("archivedRoom", log => {
-                ars.archivedRoom.afterSync(ars.changes, log);
-                ars.archivedRoom.release();
-            }, log.level.Detail);
+            log.wrap("archivedRoom", log => ars.afterSync(log), log.level.Detail);
         }
         for(let rs of roomStates) {
             if (!rs.changes) throw new Error("missing changes")
-            log.wrap("room", log => rs.object.afterSync(rs.changes!, log), log.level.Detail);
+            log.wrap("room", log => rs.afterSync(log), log.level.Detail);
         }
         for(let ss of spaceStates) {
-            if (!ss.changes) throw new Error("missing changes")
-            log.wrap("room", log => ss.object.afterSync(ss.changes!, log), log.level.Detail);
+            log.wrap("room", log => ss.afterSync(log), log.level.Detail);
         }
         for(let is of inviteStates) {
-            log.wrap("invite", log => is.invite.afterSync(is.changes, log), log.level.Detail);
+            log.wrap("invite", log => is.afterSync(log), log.level.Detail);
         }
         this._session.applyRoomCollectionChangesAfterSync(inviteStates, roomStates, spaceStates, archivedRoomStates, log);
     }
@@ -634,6 +639,11 @@ class SessionSyncProcessState {
         this.changes = await this._session.writeSync(syncResponse, syncFilterId, this.preparation, txn, log);
     }
 
+    afterSync() {
+        if (!this.changes) throw new Error("cannot afterSync before writeSync")
+        return this._session.afterSync(this.changes);
+    }
+
     dispose() {
         this.lock?.release();
     }
@@ -644,6 +654,7 @@ abstract class BaseRoomOrSpaceSyncProcessState<T extends Room | Space> {
     isNewRoom: boolean;
     roomResponse: JoinedRoom | LeftRoom;
     membership?: Membership;
+    private _wasAfterPrepareSyncCalled = false;
 
     /**
      * Object state, created by calling prepareSync
@@ -666,12 +677,23 @@ abstract class BaseRoomOrSpaceSyncProcessState<T extends Room | Space> {
         this.preparation = await this.object.prepareSync(this.roomResponse, this.membership, newKeys, txn, log);
     }
 
+    async afterPrepareSync(log: ILogItem) {
+        if (!this.preparation) throw new Error("cannot afterPrepareSync before prepareSync")
+        this._wasAfterPrepareSyncCalled = true
+        return this.object.afterPrepareSync(this.preparation, log);
+    }
+
     async writeSync(isInitialSync: boolean, txn: Transaction, log: ILogItem
     ) {
-        if (!this.preparation) {
-            throw new Error("cannot writeSync before prepareSync")
+        if (!this._wasAfterPrepareSyncCalled) {
+            throw new Error("cannot writeSync before afterPrepareSync");
         }
-        this.changes = await this.object.writeSync(this.roomResponse, isInitialSync, this.preparation, txn, log);
+        this.changes = await this.object.writeSync(this.roomResponse, isInitialSync, this.preparation!, txn, log);
+    }
+
+    afterSync(log: ILogItem) {
+        if (!this.changes) throw new Error("cannot afterSync before writeSync");
+        this.object.afterSync(this.changes, log);
     }
 
     get id() {
@@ -716,6 +738,12 @@ export class ArchivedRoomSyncProcessState {
 
     async writeSync(txn: Transaction, log: ILogItem) {
        this.changes = await this.archivedRoom.writeSync(this.roomState?.summaryChanges, this.roomResponse, this.membership, txn, log);
+    }
+
+    afterSync(log: ILogItem) {
+        if (!this.changes) throw new Error("cannot afterSync before writeSync");
+        this.archivedRoom.afterSync(this.changes, log);
+        this.archivedRoom.release();
     }
 
     get id(): string {
@@ -776,6 +804,11 @@ export class InviteSyncProcessState {
 
     async writeSync(txn: Transaction, log: ILogItem) {
         this.changes = await this.invite.writeSync(this.membership, this.roomResponse, txn, log)
+    }
+
+    afterSync(log: ILogItem) {
+        if (!this.changes) throw new Error("cannot afterSync before writeSync");
+        this.invite.afterSync(this.changes, log);
     }
 
     get id(): string {
