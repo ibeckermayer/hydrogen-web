@@ -200,13 +200,13 @@ export class Sync {
         const roomsPromises = roomStates.map(async rs => {
             try {
                 if (!rs.changes) throw new Error("missing changes")
-                await rs.object.afterSyncCompleted(rs.changes, log);
+                await rs.roomOrSpace.afterSyncCompleted(rs.changes, log);
             } catch (err) {} // error is logged, but don't fail roomsPromises
         });
         const spacesPromises = spaceStates.map(async ss => {
             try {
                 if (!ss.changes) throw new Error("missing changes")
-                await ss.object.afterSyncCompleted(ss.changes, log);
+                await ss.roomOrSpace.afterSyncCompleted(ss.changes, log);
             } catch (err) {} // error is logged, but don't fail spacesPromises
         });
         // run everything in parallel,
@@ -304,29 +304,22 @@ export class Sync {
             }
         }
 
-        await Promise.all(roomStates.map(async rs => {
-            const newKeys = newKeysByRoom?.get(rs.object.id) ?? [];
-            log.wrap("room", async log => {
+        const doPrepareSync = async (rs: RoomSyncProcessState, logLabel: string) => {
+            const newKeys = newKeysByRoom?.get(rs.roomOrSpace.id) ?? [];
+            log.wrap(logLabel, async log => {
                 // if previously joined and we still have the timeline for it,
                 // this loads the syncWriter at the correct position to continue writing the timeline
                 if (rs.isNewRoom) {
-                    await rs.object.load(undefined, prepareTxn, log);
+                    await rs.roomOrSpace.load(undefined, prepareTxn, log);
                 }
                 await rs.prepareSync(newKeys, prepareTxn, log);
             }, log.level.Detail);
-        }));
+        }
 
-        await Promise.all(spaceStates.map(async ss => {
-            const newKeys = newKeysByRoom?.get(ss.object.id) ?? [];
-            log.wrap("space", async log => {
-                // if previously joined and we still have the timeline for it,
-                // this loads the syncWriter at the correct position to continue writing the timeline
-                if (ss.isNewRoom) {
-                    await ss.object.load(undefined, prepareTxn, log);
-                }
-                await ss.prepareSync(newKeys, prepareTxn, log);
-            }, log.level.Detail);
-        }));
+        await Promise.all([
+            ...roomStates.map(rs => doPrepareSync(rs, "room")),
+            ...spaceStates.map(ss => doPrepareSync(ss, "space")),
+        ])
 
         // This is needed for safari to not throw TransactionInactiveErrors on the syncTxn. See docs/INDEXEDDB.md
         await prepareTxn.complete();
@@ -334,12 +327,12 @@ export class Sync {
 
     _afterPrepareSync(roomStates: RoomSyncProcessState[], spaceStates: SpaceSyncProcessState[], log: ILogItem) {
         return Promise.all([
-            Promise.all(roomStates.map(rs => {
+            ...roomStates.map(rs => {
                 return rs.afterPrepareSync(log);
-            })),
-            Promise.all(spaceStates.map(rs => {
-                return rs.afterPrepareSync(log);
-            }))
+            }),
+            ...spaceStates.map(ss => {
+                return ss.afterPrepareSync(log);
+            })
         ]);
     }
 
@@ -356,22 +349,22 @@ export class Sync {
       ): Promise<void> {
         const syncTxn = await this._openSyncTxn();
         try {
+            await log.wrap("session", log => sessionState.writeSync(response, syncFilterId, syncTxn, log));
             await Promise.all([
-                log.wrap("session", log => sessionState.writeSync(response, syncFilterId, syncTxn, log)),
-                Promise.all(inviteStates.map(async is => {
-                    await log.wrap("invite", log => is.writeSync(syncTxn, log));
-                })),
-                Promise.all(roomStates.map(async rs => {
-                    await log.wrap("room", log => rs.writeSync(isInitialSync, syncTxn, log));
-                })),
-                Promise.all(spaceStates.map(async ss => {
-                    await log.wrap("space", log => ss.writeSync(isInitialSync, syncTxn, log));
-                }))
+                ...inviteStates.map((is) => {
+                    return log.wrap("invite", log => is.writeSync(syncTxn, log));
+                }),
+                ...roomStates.map(rs => {
+                    return log.wrap("room", log => rs.writeSync(isInitialSync, syncTxn, log));
+                }),
+                ...spaceStates.map(ss => {
+                    return log.wrap("space", log => ss.writeSync(isInitialSync, syncTxn, log));
+                })
             ])
             // important to do this after roomStates,
             // as we're referring to the roomState to get the summaryChanges
-            await Promise.all(archivedRoomStates.map(async ars => {
-                await log.wrap("archivedRoom", log => ars.writeSync(syncTxn, log));
+            await Promise.all(archivedRoomStates.map(ars => {
+                return log.wrap("archivedRoom", log => ars.writeSync(syncTxn, log));
             }));
         } catch(err) {
             // avoid corrupting state by only
@@ -649,8 +642,8 @@ class SessionSyncProcessState {
     }
 }
 
-abstract class BaseRoomOrSpaceSyncProcessState<T extends Room | Space> {
-    object: T;
+export class RoomSyncProcessState {
+    roomOrSpace: Room;
     isNewRoom: boolean;
     roomResponse: JoinedRoom | LeftRoom;
     membership?: Membership;
@@ -666,21 +659,21 @@ abstract class BaseRoomOrSpaceSyncProcessState<T extends Room | Space> {
      */
     changes?: RoomWriteSyncChanges;
 
-    constructor(object: T, isNewRoom: boolean, roomResponse: JoinedRoom | LeftRoom, membership?: Membership) {
-        this.object = object;
+    constructor(roomOrSpace: Room, isNewRoom: boolean, roomResponse: JoinedRoom | LeftRoom, membership?: Membership) {
+        this.roomOrSpace = roomOrSpace;
         this.isNewRoom = isNewRoom;
         this.roomResponse = roomResponse;
         this.membership = membership;
     }
 
     async prepareSync(newKeys: IncomingRoomKey[], txn: Transaction, log: ILogItem) {
-        this.preparation = await this.object.prepareSync(this.roomResponse, this.membership, newKeys, txn, log);
+        this.preparation = await this.roomOrSpace.prepareSync(this.roomResponse, this.membership, newKeys, txn, log);
     }
 
     async afterPrepareSync(log: ILogItem) {
         if (!this.preparation) throw new Error("cannot afterPrepareSync before prepareSync")
         this._wasAfterPrepareSyncCalled = true
-        return this.object.afterPrepareSync(this.preparation, log);
+        return this.roomOrSpace.afterPrepareSync(this.preparation, log);
     }
 
     async writeSync(isInitialSync: boolean, txn: Transaction, log: ILogItem
@@ -688,16 +681,16 @@ abstract class BaseRoomOrSpaceSyncProcessState<T extends Room | Space> {
         if (!this._wasAfterPrepareSyncCalled) {
             throw new Error("cannot writeSync before afterPrepareSync");
         }
-        this.changes = await this.object.writeSync(this.roomResponse, isInitialSync, this.preparation!, txn, log);
+        this.changes = await this.roomOrSpace.writeSync(this.roomResponse, isInitialSync, this.preparation!, txn, log);
     }
 
     afterSync(log: ILogItem) {
         if (!this.changes) throw new Error("cannot afterSync before writeSync");
-        this.object.afterSync(this.changes, log);
+        this.roomOrSpace.afterSync(this.changes, log);
     }
 
     get id() {
-        return this.object.id;
+        return this.roomOrSpace.id;
     }
 
     get shouldAdd() {
@@ -713,8 +706,7 @@ abstract class BaseRoomOrSpaceSyncProcessState<T extends Room | Space> {
     }
 }
 
-export class RoomSyncProcessState extends BaseRoomOrSpaceSyncProcessState<Room> {}
-export class SpaceSyncProcessState extends BaseRoomOrSpaceSyncProcessState<Space> {}
+export class SpaceSyncProcessState extends RoomSyncProcessState {}
 
 export class ArchivedRoomSyncProcessState {
     archivedRoom: ArchivedRoom;

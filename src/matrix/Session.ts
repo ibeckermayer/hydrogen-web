@@ -884,7 +884,7 @@ export class Session {
         // update the collections after sync
         for (const rs of roomStates) {
             if (rs.shouldAdd) {
-                this._rooms?.add(rs.id, rs.object);
+                this._rooms?.add(rs.id, rs.roomOrSpace);
                 this._tryReplaceRoomBeingCreated(rs.id, log);
             } else if (rs.shouldRemove) {
                 this._rooms?.remove(rs.id);
@@ -893,7 +893,7 @@ export class Session {
         // update the collections after sync
         for (const ss of spaceStates) {
             if (ss.shouldAdd) {
-                this._spaces?.add(ss.id, ss.object);
+                this._spaces?.add(ss.id, ss.roomOrSpace);
                 this._tryReplaceRoomBeingCreated(ss.id, log);
             } else if (ss.shouldRemove) {
                 this._spaces?.remove(ss.id);
