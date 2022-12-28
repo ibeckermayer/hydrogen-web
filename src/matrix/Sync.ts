@@ -351,8 +351,7 @@ export class Sync {
                 response, syncFilterId, sessionState.preparation, syncTxn, log));
             await log.wrap("session", log => sessionState.writeSync(response, syncFilterId, syncTxn, log));
             await Promise.all(inviteStates.map(async is => {
-                is.changes = await log.wrap("invite", log => is.invite.writeSync(
-                    is.membership, is.roomResponse, syncTxn, log));
+                log.wrap("invite", log => is.writeSync(syncTxn, log));
             }));
             await Promise.all(roomStates.map(async rs => {
                 await log.wrap("room", log => rs.writeSync(isInitialSync, syncTxn, log));
@@ -363,9 +362,7 @@ export class Sync {
             // important to do this after roomStates,
             // as we're referring to the roomState to get the summaryChanges
             await Promise.all(archivedRoomStates.map(async ars => {
-                const summaryChanges = ars.roomState?.summaryChanges;
-                ars.changes = await log.wrap("archivedRoom", log => ars.archivedRoom.writeSync(
-                    summaryChanges, ars.roomResponse, ars.membership, syncTxn, log));
+                await log.wrap("archivedRoom", log => ars.writeSync(syncTxn, log));
             }));
         } catch(err) {
             // avoid corrupting state by only
@@ -703,6 +700,10 @@ export class ArchivedRoomSyncProcessState {
     roomResponse: JoinedRoom | LeftRoom;
     membership: "join" | "leave";
     isInitialSync?: boolean;
+
+    /**
+     * Object state, created by calling writeSync
+     */
     changes?: {};
 
     constructor(archivedRoom: ArchivedRoom, roomState: RoomSyncProcessState | undefined, roomResponse: JoinedRoom | LeftRoom, membership: "join" | "leave", isInitialSync?: boolean) {
@@ -711,6 +712,10 @@ export class ArchivedRoomSyncProcessState {
         this.roomResponse = roomResponse;
         this.membership = membership;
         this.isInitialSync = isInitialSync;
+    }
+
+    async writeSync(txn: Transaction, log: ILogItem) {
+       this.changes = await this.archivedRoom.writeSync(this.roomState?.summaryChanges, this.roomResponse, this.membership, txn, log);
     }
 
     get id(): string {
@@ -756,6 +761,10 @@ export class InviteSyncProcessState {
     isNewInvite: boolean;
     roomResponse: InvitedRoom | undefined;
     membership: "join" | "leave" | "invite";
+
+    /**
+     * Object state, created by calling writeSync
+     */
     changes?: InviteWriteSyncChanges;
 
     constructor(invite: Invite, isNewInvite: boolean, roomResponse: InvitedRoom | undefined, membership: "join" | "leave" | "invite") {
@@ -763,6 +772,10 @@ export class InviteSyncProcessState {
         this.isNewInvite = isNewInvite;
         this.membership = membership;
         this.roomResponse = roomResponse;
+    }
+
+    async writeSync(txn: Transaction, log: ILogItem) {
+        this.changes = await this.invite.writeSync(this.membership, this.roomResponse, txn, log)
     }
 
     get id(): string {
