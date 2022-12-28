@@ -329,7 +329,6 @@ export class Room extends BaseRoom {
     }
 
     /**
-     * Only called if the result of writeSync had `needsAfterSyncCompleted` set.
      * Can be used to do longer running operations that resulted from the last sync,
      * like network operations.
      */

@@ -155,6 +155,22 @@ export class Session {
         this._createRoomEncryption = this._createRoomEncryption.bind(this);
         this._forgetArchivedRoom = this._forgetArchivedRoom.bind(this);
         this.needsKeyBackup = new ObservableValue(false);
+
+        // todo(isaiah): remove this
+        this._spaces.subscribe({
+            onReset(): void {
+                console.log("space onReset called")
+            },
+            onAdd(key: string, value: Space): void {
+                console.log(`added Space: ${key}`)
+            },
+            onUpdate(key: string, value: Space, params: any): void {
+                console.log(`updated Space: ${key}`)
+            },
+            onRemove(key: string, value: Space): void {
+                console.log(`removed Space: ${key}`)
+            },
+        })
     }
 
     get fingerprintKey(): string | undefined {
@@ -880,7 +896,7 @@ export class Session {
                 this._spaces?.add(ss.id, ss.object);
                 this._tryReplaceRoomBeingCreated(ss.id, log);
             } else if (ss.shouldRemove) {
-                this._rooms?.remove(ss.id);
+                this._spaces?.remove(ss.id);
             }
         }
         for (const is of inviteStates) {
@@ -1064,6 +1080,11 @@ export class Session {
         return archivedRoom;
     }
 
+    /**
+     * If an archived room has already been loaded into memory, retains it and returns it.
+     * Otherwise, checks the database for an archived room summary. If that exists, loads
+     * the archived room into memory.
+     */
     loadArchivedRoom(roomId: string, log?: ILogItem): ArchivedRoom | undefined {
         return this._platform.logger.wrapOrRun(log, "loadArchivedRoom", async log => {
             log.set("id", roomId);
