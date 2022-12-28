@@ -383,7 +383,7 @@ export class BaseRoom extends EventEmitter<{change: void}> {
                 this._fragmentIdComparer.add(fragment);
             }
             if (extraGapFillChanges) {
-                this._applyGapFill();
+                this._applyGapFill(extraGapFillChanges);
             }
             if (this._timeline) {
                 // these should not be added if not already there
