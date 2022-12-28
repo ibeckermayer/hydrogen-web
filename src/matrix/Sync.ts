@@ -237,14 +237,14 @@ export class Sync {
         const response = await (this._currentRequest as IHomeServerRequest<SyncResponse>).response();
 
         const isInitialSync = !syncToken;
-        const sessionState = new SessionSyncProcessState();
+        const sessionState = new SessionSyncProcessState(this._session);
         const inviteStates = this._parseInvites(response.rooms);
         const {roomStates, archivedRoomStates, spaceStates} = await this._parseRoomsResponse(
             response.rooms, inviteStates, isInitialSync, log);
 
         try {
             // take a lock on olm sessions used in this sync so sending a message doesn't change them while syncing
-            sessionState.lock = await log.wrap("obtainSyncLock", () => this._session.obtainSyncLock(response));
+            await log.wrap("obtainSyncLock", () => sessionState.obtainSyncLock(response));
             await log.wrap("prepare", log => this._prepareSync(sessionState, roomStates, spaceStates, response, log));
             await log.wrap("afterPrepareSync", log => Promise.all(roomStates.map(rs => {
                 return rs.object.afterPrepareSync(rs.preparation, log);
@@ -284,8 +284,7 @@ export class Sync {
 
     async _prepareSync(sessionState: SessionSyncProcessState, roomStates: RoomSyncProcessState[], spaceStates: SpaceSyncProcessState[], response: SyncResponse, log: ILogItem): Promise<void> {
         const prepareTxn = await this._openPrepareSyncTxn();
-        sessionState.preparation = await log.wrap("session", log => this._session.prepareSync(
-            response, sessionState.lock, prepareTxn, log));
+        await log.wrap("session", log => sessionState.prepareSync(response, prepareTxn, log));
 
         const newKeysByRoom = sessionState.preparation?.newKeysByRoom;
 
@@ -350,6 +349,7 @@ export class Sync {
         try {
             sessionState.changes = await log.wrap("session", log => this._session.writeSync(
                 response, syncFilterId, sessionState.preparation, syncTxn, log));
+            await log.wrap("session", log => sessionState.writeSync(response, syncFilterId, syncTxn, log));
             await Promise.all(inviteStates.map(async is => {
                 is.changes = await log.wrap("invite", log => is.invite.writeSync(
                     is.membership, is.roomResponse, syncTxn, log));
@@ -603,9 +603,39 @@ export class Sync {
 }
 
 class SessionSyncProcessState {
+    private _session: Session
     lock?: ILock;
+
+    // Because calling prepareSync may still result in this being undefined, we need
+    // a bool to determine whether the sync has been prepared or not.
+    private _wasPrepareSyncCalled = false
+    /**
+     * Object state, created by calling prepareSync
+     */
     preparation?: SyncPreparation;
-    changes: SessionSyncChanges;
+
+    /**
+     * Object state, created by calling writeSync
+     */
+    changes?: SessionSyncChanges;
+
+    constructor(session: Session) {
+        this._session = session;
+    }
+
+    async obtainSyncLock(syncResponse: SyncResponse) {
+        this.lock = await this._session.obtainSyncLock(syncResponse);
+    }
+
+    async prepareSync(response: SyncResponse, txn: Transaction, log: ILogItem) {
+        this._wasPrepareSyncCalled = true;
+        this.preparation = await this._session.prepareSync(response, this.lock, txn, log);
+    }
+
+    async writeSync(syncResponse: SyncResponse, syncFilterId: number | undefined, txn: Transaction, log: ILogItem) {
+        if (!this._wasPrepareSyncCalled) throw new Error("cannot writeSync before prepareSync")
+        this.changes = await this._session.writeSync(syncResponse, syncFilterId, this.preparation, txn, log);
+    }
 
     dispose() {
         this.lock?.release();
