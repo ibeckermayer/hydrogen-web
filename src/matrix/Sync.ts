@@ -213,7 +213,7 @@ export class Sync {
         // we don't want to delay the next sync too much
         // Also, since all promises won't reject (as they have a try/catch)
         // it's fine to use Promise.all
-        await Promise.all(roomsPromises.concat(sessionPromise).concat(spacesPromises));
+        await Promise.all([sessionPromise, ...roomsPromises, ...spacesPromises]);
     }
 
     async _syncRequest(
