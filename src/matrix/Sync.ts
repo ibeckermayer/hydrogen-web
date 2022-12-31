@@ -710,7 +710,7 @@ export class SpaceSyncProcessState extends RoomSyncProcessState {}
 
 export class ArchivedRoomSyncProcessState {
     archivedRoom: ArchivedRoom;
-    roomState: RoomSyncProcessState | undefined;
+    roomState?: RoomSyncProcessState;
     roomResponse: JoinedRoom | LeftRoom;
     membership: "join" | "leave";
     isInitialSync?: boolean;

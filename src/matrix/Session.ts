@@ -110,8 +110,8 @@ export class Session {
     private _megolmEncryption: MegOlmEncryption;
     private _megolmDecryption?: MegOlmDecryption;
     private _getSyncToken: () => string | undefined;
-    private _keyBackup: ObservableValue<KeyBackup | undefined | null>;
-    private _observedRoomStatus: Map<string, RetainedObservableValue<number | RoomStatus>>;
+    private _keyBackup: ObservableValue<KeyBackup | undefined>;
+    private _observedRoomStatus: Map<string, RetainedObservableValue<RoomStatus>>;
 
 
     constructor({storage, hsApi, sessionInfo, olm, olmWorker, platform, mediaRepository}: Options) {
@@ -284,7 +284,7 @@ export class Session {
             }
             if (this._keyBackup.get()) {
                 this._keyBackup.get()?.dispose();
-                this._keyBackup.set(null);
+                this._keyBackup.set(undefined);
             }
             const key = await ssssKeyFromCredential(type, credential, this._storage, this._platform, this._olm);
             // and create key backup, which needs to read from accountData
@@ -358,7 +358,7 @@ export class Session {
                 }
             }
             this._keyBackup.get()?.dispose();
-            this._keyBackup.set(null);
+            this._keyBackup.set(undefined);
         }
     }
 
@@ -609,7 +609,7 @@ export class Session {
             if (!this._keyBackup.get()) {
                 // null means key backup isn't configured yet
                 // as opposed to undefined, which means we're still checking
-                this._keyBackup.set(null);
+                this._keyBackup.set(undefined);
             }
         }
         // restore unfinished operations, like sending out room keys
@@ -918,6 +918,11 @@ export class Session {
             for (const rs of roomStates) {
                 if (rs.shouldAdd) {
                     this._observedRoomStatus.get(rs.id)?.set(RoomStatus.Joined);
+                }
+            }
+            for (const ss of spaceStates) {
+                if (ss.shouldAdd) {
+                    this._observedRoomStatus.get(ss.id)?.set(RoomStatus.Joined);
                 }
             }
             for (const is of inviteStates) {
