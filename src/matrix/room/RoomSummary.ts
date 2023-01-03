@@ -238,27 +238,27 @@ export class SummaryData {
     tags?: Content;
     isDirectMessage: boolean;
     dmUserId?: string;
-    cloned?: boolean;
+    cloned: boolean;
     isSpace: boolean;
 
     constructor(copy?: SummaryData | SerializedSummaryData, roomId?: string, isSpace?: boolean) {
-        this.roomId = copy?.roomId || roomId;
+        this.roomId = copy?.roomId ?? roomId;
         this.name = copy?.name;
         this.lastMessageTimestamp = copy?.lastMessageTimestamp;
         this.isUnread = copy ? copy.isUnread : false;
         this.encryption = copy?.encryption;
         this.membership = copy?.membership;
-        this.inviteCount = copy?.inviteCount || 0;
-        this.joinCount = copy?.joinCount || 0;
+        this.inviteCount = copy?.inviteCount ?? 0;
+        this.joinCount = copy?.joinCount ?? 0;
         this.heroes = copy?.heroes;
         this.canonicalAlias = copy?.canonicalAlias;
-        this.hasFetchedMembers = copy?.hasFetchedMembers || false;
-        this.isTrackingMembers = copy?.isTrackingMembers || false;
+        this.hasFetchedMembers = copy?.hasFetchedMembers ?? false;
+        this.isTrackingMembers = copy?.isTrackingMembers ?? false;
         this.avatarUrl = copy?.avatarUrl;
-        this.notificationCount = copy?.notificationCount || 0;
-        this.highlightCount = copy?.highlightCount || 0;
+        this.notificationCount = copy?.notificationCount ?? 0;
+        this.highlightCount = copy?.highlightCount ?? 0;
         this.tags = copy?.tags;
-        this.isDirectMessage = copy?.isDirectMessage || false;
+        this.isDirectMessage = copy?.isDirectMessage ?? false;
         this.dmUserId = copy?.dmUserId;
         this.cloned = copy ? true : false;
         this.isSpace = copy ? copy.isSpace : isSpace ?? false;

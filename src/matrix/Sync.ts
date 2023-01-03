@@ -389,7 +389,6 @@ export class Sync {
             log.wrap("archivedRoom", log => ars.afterSync(log), log.level.Detail);
         }
         for(let rs of roomStates) {
-            if (!rs.changes) throw new Error("missing changes")
             log.wrap("room", log => rs.afterSync(log), log.level.Detail);
         }
         for(let ss of spaceStates) {
@@ -512,10 +511,12 @@ export class Sync {
      * whether it has the characteristic "m.space" type.
      */
     _isSpaceResponse(roomId: string, roomResponse: JoinedRoom | LeftRoom): boolean {
+        // A response with this roomId was previously identified as a space
         if (this._session.spaces?.get(roomId) !== undefined) {
             return true
         }
 
+        // We found a space creation event in this response
         if (roomResponse.timeline?.events?.filter(e => isSpaceCreateEvent(e)).length ?? 0 > 0) {
             return true
         }
