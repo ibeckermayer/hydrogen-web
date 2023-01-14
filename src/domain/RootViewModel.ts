@@ -22,6 +22,7 @@ import {LogoutViewModel} from "./LogoutViewModel";
 import {ForcedLogoutViewModel} from "./ForcedLogoutViewModel";
 import {SessionPickerViewModel} from "./SessionPickerViewModel";
 import {ViewModel, Options as ViewModelOptions} from "./ViewModel";
+import { getDefaultRoomManagers } from "../matrix/room/RoomManager";
 
 export class RootViewModel extends ViewModel {
     private _error?: any;
@@ -160,7 +161,7 @@ export class RootViewModel extends ViewModel {
     }
 
     _showSessionLoader(sessionId: string) {
-        const client = new Client(this.platform);
+        const client = new Client(this.platform, getDefaultRoomManagers());
         client.startWithExistingSession(sessionId);
         this._setSection(() => {
             this._sessionLoadViewModel = new SessionLoadViewModel(this.childOptions({

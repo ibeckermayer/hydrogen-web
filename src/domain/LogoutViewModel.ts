@@ -17,6 +17,7 @@ limitations under the License.
 import {Options as BaseOptions, ViewModel} from "./ViewModel";
 import {Client} from "../matrix/Client";
 import {SegmentType} from "./navigation/index";
+import { getDefaultRoomManagers } from "../matrix/room/RoomManager";
 
 type Options = { sessionId: string; } & BaseOptions;
 
@@ -51,7 +52,7 @@ export class LogoutViewModel extends ViewModel<SegmentType, Options> {
         this._showConfirm = false;
         this.emitChange("busy");
         try {
-            const client = new Client(this.platform);
+            const client = new Client(this.platform, getDefaultRoomManagers());
             await client.startLogout(this._sessionId);
             this.navigation.push("session", true);
         } catch (err) {

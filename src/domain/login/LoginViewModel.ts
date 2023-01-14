@@ -24,6 +24,7 @@ import {SessionLoadViewModel} from "../SessionLoadViewModel";
 import {SegmentType} from "../navigation/index";
 
 import type {PasswordLoginMethod, SSOLoginHelper, TokenLoginMethod, ILoginMethod} from "../../matrix/login";
+import { getDefaultRoomManagers } from "../../matrix/room/RoomManager";
 
 export type Options = {
     defaultHomeserver: string;
@@ -55,7 +56,7 @@ export class LoginViewModel extends ViewModel<SegmentType, Options> {
         const {ready, defaultHomeserver, loginToken} = options;
         this._ready = ready;
         this._loginToken = loginToken;
-        this._client = new Client(this.platform);
+        this._client = new Client(this.platform, getDefaultRoomManagers());
         this._homeserver = defaultHomeserver;
         this._initViewModels();
     }

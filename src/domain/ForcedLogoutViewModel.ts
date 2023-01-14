@@ -17,6 +17,7 @@ limitations under the License.
 import {Options as BaseOptions, ViewModel} from "./ViewModel";
 import {Client} from "../matrix/Client";
 import {SegmentType} from "./navigation/index";
+import { getDefaultRoomManagers } from "../matrix/room/RoomManager";
 
 type Options = { sessionId: string; } & BaseOptions;
 
@@ -36,7 +37,7 @@ export class ForcedLogoutViewModel extends ViewModel<SegmentType, Options> {
 
     async forceLogout(): Promise<void> {
         try {
-            const client = new Client(this.platform);
+            const client = new Client(this.platform, getDefaultRoomManagers());
             await client.startForcedLogout(this._sessionId);
         }
         catch (err) {

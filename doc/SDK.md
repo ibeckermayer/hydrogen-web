@@ -33,6 +33,7 @@ import {
     RoomViewModel,
     TimelineView,
     viewClassForTile
+    getDefaultRoomManagers
 } from "hydrogen-view-sdk";
 import downloadSandboxPath from 'hydrogen-view-sdk/download-sandbox.html?url';
 import workerPath from 'hydrogen-view-sdk/main.js?url';
@@ -62,7 +63,7 @@ async function main() {
         history: platform.history
     });
     urlRouter.attach();
-    const client = new Client(platform);
+    const client = new Client(this.platform, getDefaultRoomManagers());
 
     const loginOptions = await client.queryLogin("matrix.org").result;
     client.startWithLogin(loginOptions.password("username", "password"));

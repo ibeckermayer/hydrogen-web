@@ -4,6 +4,7 @@ import { IncomingRoomKey } from '../e2ee/megolm/decryption/RoomKey';
 import { Rooms } from '../net/types/sync';
 import { Session } from '../Session';
 import { Transaction } from '../storage/idb/Transaction';
+import { InstantMessageRoomManager } from './InstantMessageRoomManager';
 
 // An IRoomManager is responsible for managing the lifecycle of a particular
 // room type (https://spec.matrix.org/v1.4/client-server-api/#types).
@@ -100,3 +101,6 @@ export interface IRoomManager<J, I, L> {
     get leaveRooms(): ObservableMap<string, L>;
 }
 
+export function getDefaultRoomManagers(): Map<string, IRoomManager<any, any, any>> {
+    return new Map([['imRooms', new InstantMessageRoomManager()]])
+}

@@ -18,6 +18,7 @@ export {Platform} from "./platform/web/Platform";
 export {Client, LoadStatus} from "./matrix/Client";
 export {RoomStatus} from "./matrix/room/common";
 export {PowerLevels} from "./matrix/room/PowerLevels.js";
+export {getDefaultRoomManagers} from "./matrix/room/RoomManager";
 // export main view & view models
 export {createNavigation, createRouter} from "./domain/navigation/index";
 export {RootViewModel} from "./domain/RootViewModel";

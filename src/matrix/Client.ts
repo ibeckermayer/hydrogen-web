@@ -42,6 +42,7 @@ import type {IHomeServerRequest} from "./net/HomeServerRequest";
 import type {ISessionInfo} from "./sessioninfo/localstorage/SessionInfoStorage";
 import { InstantMessageRoom } from "./room/InstantMessageRoom";
 import { InstantMessageRoomManager } from "./room/InstantMessageRoomManager";
+import { IRoomManager } from "./room/RoomManager";
 
 export enum LoadStatus {
     NotLoading = "NotLoading",
@@ -80,13 +81,15 @@ export class Client {
     private _accountSetup?: AccountSetup;
     private _reconnectSubscription?: SubscriptionHandle;
     private _waitForFirstSyncHandle?: IWaitHandle<SyncStatus>;
+    private _roomManagers: Map<string, IRoomManager<any, any, any>>;
 
-    constructor(platform: Platform) {
+    constructor(platform: Platform, roomManagers: Map<string, IRoomManager<any, any, any>>) {
         this._platform = platform;
         this._sessionStartedByReconnector = false;
         this._status = new ObservableValue(LoadStatus.NotLoading);
         this._olmPromise = platform.loadOlm();
         this._workerPromise = platform.loadOlmWorker();
+        this._roomManagers = roomManagers;
     }
 
     createNewSessionId(): string {
@@ -309,7 +312,7 @@ export class Client {
             olmWorker,
             mediaRepository,
             platform: this._platform,
-            roomManagers: new Map([['imRooms', new InstantMessageRoomManager()]]) // todo(isaiah): make these configurable via the Client's constructor
+            roomManagers: this._roomManagers,
         });
         await this._session.load(log);
         if (dehydratedDevice) {
