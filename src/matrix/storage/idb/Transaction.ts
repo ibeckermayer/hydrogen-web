@@ -51,12 +51,12 @@ class WriteErrorInfo {
 
 export class Transaction {
     private _txn: IDBTransaction;
-    private _allowedStoreNames: StoreNames[];
+    private _allowedStoreNames: (StoreNames | string)[];
     private _stores: { [storeName in StoreNames]?: any };
     private _storage: Storage;
     private _writeErrors: WriteErrorInfo[];
 
-    constructor(txn: IDBTransaction, allowedStoreNames: StoreNames[], storage: Storage) {
+    constructor(txn: IDBTransaction, allowedStoreNames: (StoreNames | string)[], storage: Storage) {
         this._txn = txn;
         this._allowedStoreNames = allowedStoreNames;
         this._stores = {};

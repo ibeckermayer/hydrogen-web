@@ -40,6 +40,8 @@ import type {SubscriptionHandle} from "../observable/BaseObservable";
 import type {EncryptedDehydratedDevice} from "./e2ee/Dehydration";
 import type {IHomeServerRequest} from "./net/HomeServerRequest";
 import type {ISessionInfo} from "./sessioninfo/localstorage/SessionInfoStorage";
+import { InstantMessageRoom } from "./room/InstantMessageRoom";
+import { InstantMessageRoomManager } from "./room/InstantMessageRoomManager";
 
 export enum LoadStatus {
     NotLoading = "NotLoading",
@@ -307,6 +309,7 @@ export class Client {
             olmWorker,
             mediaRepository,
             platform: this._platform,
+            roomManagers: new Map([['imRooms', new InstantMessageRoomManager()]]) // todo(isaiah): make these configurable via the Client's constructor
         });
         await this._session.load(log);
         if (dehydratedDevice) {

@@ -33,7 +33,7 @@ import {SyncStatus} from "../../matrix/Sync";
 
 import type {Options as ViewModelOptions} from "../ViewModel";
 import type {Client} from "../../matrix/Client";
-import type {Room} from "../../matrix/room/Room";
+import type {InstantMessageRoom} from "../../matrix/room/InstantMessageRoom";
 import type {IGridItemViewModel} from "./room/IGridItemViewModel";
 
 type Options = {
@@ -345,7 +345,7 @@ export class SessionViewModel extends ViewModel {
         return this._lightboxViewModel;
     }
 
-    _roomFromNavigation(): Room | undefined {
+    _roomFromNavigation(): InstantMessageRoom | undefined {
         const roomId = this.navigation.path.get("room")?.value;
         const room = this.client.session.rooms?.get(roomId);
         return room;

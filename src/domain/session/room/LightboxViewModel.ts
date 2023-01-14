@@ -16,13 +16,13 @@ limitations under the License.
 
 import {ViewModel} from "../../ViewModel";
 import type {Options as ViewModelOptions} from "../../ViewModel";
-import type {Room} from "../../../matrix/room/Room";
+import type {InstantMessageRoom} from "../../../matrix/room/InstantMessageRoom";
 import type {EventEntry} from "../../../matrix/room/timeline/entries/EventEntry";
 import type {BlobHandle} from "../../../platform/web/dom/BlobHandle";
 
 type Options = {
     eventId: string;
-    room: Room;
+    room: InstantMessageRoom;
 } & ViewModelOptions
 
 export class LightboxViewModel extends ViewModel {
@@ -41,7 +41,7 @@ export class LightboxViewModel extends ViewModel {
         this._subscribeToEvent(options.room, options.eventId);
     }
 
-    _subscribeToEvent(room: Room, eventId: string): void {
+    _subscribeToEvent(room: InstantMessageRoom, eventId: string): void {
         const eventObservable = room.observeEvent(eventId);
         this.track(eventObservable.subscribe(eventEntry => {
             void this._loadEvent(room, eventEntry);
@@ -49,7 +49,7 @@ export class LightboxViewModel extends ViewModel {
         void this._loadEvent(room, eventObservable.get());
     }
 
-    async _loadEvent(room: Room, eventEntry: any | null): Promise<void> {
+    async _loadEvent(room: InstantMessageRoom, eventEntry: any | null): Promise<void> {
         if (!eventEntry) {
             return;
         }

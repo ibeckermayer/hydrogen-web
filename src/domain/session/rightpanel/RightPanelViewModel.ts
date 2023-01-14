@@ -23,18 +23,18 @@ import {MemberListViewModel} from "./MemberListViewModel";
 import type {ExplicitOptions as MemberListViewModelOptions} from "./MemberListViewModel";
 import {MemberDetailsViewModel} from "./MemberDetailsViewModel";
 import type {ExplicitOptions as MemberDetailsViewModelOptions} from "./MemberDetailsViewModel";
-import type {Room} from "../../../matrix/room/Room";
+import type {InstantMessageRoom} from "../../../matrix/room/InstantMessageRoom";
 import type {Session} from "../../../matrix/Session";
 import type {MemberList} from "../../../matrix/room/members/MemberList";
 
 
 type Options = {
-    room: Room,
+    room: InstantMessageRoom,
     session: Session,
 } & BaseOptions;
 
 export class RightPanelViewModel extends ViewModel {
-    private _room: Room;
+    private _room: InstantMessageRoom;
     private _session: Session;
     private _members?: MemberList;
     private _activeViewModel?: ActiveViewModel;

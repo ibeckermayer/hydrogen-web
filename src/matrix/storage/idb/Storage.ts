@@ -42,15 +42,7 @@ export class Storage {
         this.logger = logger;
     }
 
-    _validateStoreNames(storeNames: StoreNames[]): void {
-        const idx = storeNames.findIndex(name => !STORE_NAMES.includes(name));
-        if (idx !== -1) {
-            throw new StorageError(`Tried top, a transaction unknown store ${storeNames[idx]}`);
-        }
-    }
-
-    async readTxn(storeNames: StoreNames[]): Promise<Transaction> {
-        this._validateStoreNames(storeNames);
+    async readTxn(storeNames: (StoreNames | string)[]): Promise<Transaction> {
         try {
             const txn = this._db.transaction(storeNames, "readonly");
             // https://bugs.webkit.org/show_bug.cgi?id=222746 workaround,
@@ -64,8 +56,7 @@ export class Storage {
         }
     }
 
-    async readWriteTxn(storeNames: StoreNames[]): Promise<Transaction> {
-        this._validateStoreNames(storeNames);
+    async readWriteTxn(storeNames: (StoreNames | string)[]): Promise<Transaction> {
         try {
             const txn = this._db.transaction(storeNames, "readwrite");
             // https://bugs.webkit.org/show_bug.cgi?id=222746 workaround,

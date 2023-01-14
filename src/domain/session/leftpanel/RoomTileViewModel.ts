@@ -16,15 +16,15 @@ limitations under the License.
 */
 import {BaseTileViewModel, Kind, AvatarSource} from "./BaseTileViewModel";
 import {Options as ViewModelOptions} from "../../ViewModel";
-import {Room} from "../../../matrix/room/Room";
+import {InstantMessageRoom} from "../../../matrix/room/InstantMessageRoom";
 
 
 type Options = {
-    room: Room;
+    room: InstantMessageRoom;
 } & ViewModelOptions;
 
 export class RoomTileViewModel extends BaseTileViewModel {
-    private readonly _room: Room;
+    private readonly _room: InstantMessageRoom;
     private _url: string;
 
     constructor(options: Readonly<Options>) {

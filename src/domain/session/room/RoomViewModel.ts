@@ -26,7 +26,7 @@ import {imageToInfo, MultiMediaInfo} from "../common";
 import {tileClassForEntry as defaultTileClassForEntry, TimelineEntry} from "./timeline/tiles/index";
 import {joinRoom} from "../../../matrix/room/joinRoom";
 
-import type {Room} from "../../../matrix/room/Room";
+import type {InstantMessageRoom} from "../../../matrix/room/InstantMessageRoom";
 import type {ArchivedRoom} from "../../../matrix/room/ArchivedRoom";
 import type {TileClassForEntryFn, Options as TileOptions} from "./timeline/tiles";
 import type {SimpleTile} from "./timeline/tiles/SimpleTile";
@@ -38,13 +38,13 @@ import type {Options as ViewModelOptions} from "../../ViewModel";
 
 type Options = {
     client?: Client;
-    room: Room,
+    room: InstantMessageRoom,
     tileClassForEntry?: TileClassForEntryFn
 } & ViewModelOptions;
 
 export class RoomViewModel extends ViewModel implements IGridItemViewModel {
     private _client?: Client;
-    private _room: Room;
+    private _room: InstantMessageRoom;
     private _tileClassForEntry: TileClassForEntryFn;
     private _composerVM?: InternalViewModel;
     private _timelineVM?: TimelineViewModel;
@@ -424,7 +424,7 @@ export class RoomViewModel extends ViewModel implements IGridItemViewModel {
         }
     }
 
-    get room(): Room {
+    get room(): InstantMessageRoom {
         return this._room;
     }
 
@@ -460,7 +460,7 @@ function videoToInfo(video: VideoHandle): MultiMediaInfo {
 }
 
 type ArchivedViewModelOptions = {
-    archivedRoom: Room;
+    archivedRoom: InstantMessageRoom;
 } & ViewModelOptions;
 
 class ArchivedViewModel extends ViewModel {

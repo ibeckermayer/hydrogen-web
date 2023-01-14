@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {Room} from "./room/Room";
+import {InstantMessageRoom} from "./room/InstantMessageRoom";
 import {ArchivedRoom} from "./room/ArchivedRoom";
 import {RoomStatus, RoomType} from "./room/common";
 import {RoomBeingCreated} from "./room/RoomBeingCreated";
@@ -63,9 +63,10 @@ import type {PendingEntry} from "./storage/idb/stores/PendingEventStore";
 import type {Options as RoomBeingCreatedOptions} from "./room/RoomBeingCreated"
 import type {SyncResponse} from "./net/types/sync";
 import type {ILock} from "../utils/Lock";
-import type {ArchivedRoomSyncProcessState, InviteSyncProcessState, RoomSyncProcessState} from "./Sync";
 import type {Operation} from "./storage/idb/stores/OperationStore";
 import type {OlmEncryptedEvent} from "./e2ee/olm/types";
+import { IRoomManager } from "./room/RoomManager";
+import { InstantMessageRoomManager } from "./room/InstantMessageRoomManager";
 
 
 const PICKLE_KEY = "DEFAULT_KEY";
@@ -79,6 +80,7 @@ type Options = {
     olmWorker?: OlmWorker;
     platform: Platform;
     mediaRepository: MediaRepository;
+    roomManagers: Map<string, IRoomManager<any, any, any>>
 }
 
 export class Session {
@@ -94,12 +96,7 @@ export class Session {
     private _olmUtil?: Utility;
     private _user: User;
     private _deviceMessageHandler: DeviceMessageHandler;
-    private _rooms?: ObservableMap<string, Room>;
-    private _invites: ObservableMap<string, Invite>;
     private _roomsBeingCreated: ObservableMap<string, RoomBeingCreated>;
-    private _activeArchivedRooms: Map<string, ArchivedRoom>;
-    private _roomUpdateCallback: (room: Room, params: any) => boolean | undefined;
-    private _inviteUpdateCallback: (invite: Invite, params: any) => boolean;
     private _roomsBeingCreatedUpdateCallback: (rbc: RoomBeingCreated, params: any) => void;
     private _e2eeAccount?: E2EEAccount;
     private _deviceTracker?: DeviceTracker;
@@ -107,22 +104,18 @@ export class Session {
     private _keyLoader?: MegOlmKeyLoader;
     private _megolmEncryption: MegOlmEncryption;
     private _megolmDecryption?: MegOlmDecryption;
-    private _getSyncToken: () => string | undefined;
+    _getSyncToken: () => string | undefined;
     private _keyBackup: ObservableValue<KeyBackup | undefined | null>;
-    private _observedRoomStatus: Map<string, RetainedObservableValue<number | RoomStatus>>;
+    _observedRoomStatus: Map<string, RetainedObservableValue<number | RoomStatus>>;
+    private _roomManagers: Map<string, IRoomManager<any, any, any>>;
 
 
-    constructor({storage, hsApi, sessionInfo, olm, olmWorker, platform, mediaRepository}: Options) {
+    constructor({storage, hsApi, sessionInfo, olm, olmWorker, platform, mediaRepository, roomManagers}: Options) {
         this._platform = platform;
         this._storage = storage;
         this._hsApi = hsApi;
         this._mediaRepository = mediaRepository;
         this._sessionInfo = sessionInfo;
-        this._rooms = new ObservableMap();
-        this._roomUpdateCallback = (room, params) => this._rooms?.update(room.id, params);
-        this._activeArchivedRooms = new Map();
-        this._invites = new ObservableMap();
-        this._inviteUpdateCallback = (invite, params) => this._invites.update(invite.id, params);
         this._roomsBeingCreatedUpdateCallback = (rbc, params) => {
             if (rbc.isCancelled) {
                 this._roomsBeingCreated.remove(rbc.id);
@@ -150,8 +143,35 @@ export class Session {
             });
         }
         this._createRoomEncryption = this._createRoomEncryption.bind(this);
-        this._forgetArchivedRoom = this._forgetArchivedRoom.bind(this);
         this.needsKeyBackup = new ObservableValue(false);
+        this._roomManagers = roomManagers;
+        for (const [_, roomTypeManager] of this._roomManagers) {
+            roomTypeManager.init(this)
+        }
+    }
+
+    get roomManagers(): Map<string, IRoomManager<any, any, any>> {
+        return this._roomManagers;
+    }
+
+    get observedRoomStatus(): Map<string, RetainedObservableValue<number | RoomStatus>> {
+        return this._observedRoomStatus;
+    }
+
+    private get _imRoomTypeManager(): InstantMessageRoomManager {
+        const imRoomTypeManager = this._roomManagers.get('imRooms');
+        if (!imRoomTypeManager) {
+            throw new Error("cannot find instant message rooms")
+        }
+        return imRoomTypeManager as InstantMessageRoomManager;
+    }
+
+    private get _rooms(): ObservableMap<string, InstantMessageRoom> {
+        return this._imRoomTypeManager.joinRooms;
+    }
+
+    private get _invites(): ObservableMap<string, Invite> {
+        return this._imRoomTypeManager.inviteRooms;
     }
 
     get fingerprintKey(): string | undefined {
@@ -210,7 +230,7 @@ export class Session {
     // TODO: encryptionParams is the response type of the "m.room.encryption" event
     // https://spec.matrix.org/v1.4/client-server-api/#mroomencryption
     _createRoomEncryption(
-        room: Room,
+        room: InstantMessageRoom,
         encryptionParams: {
             algorithm: "m.megolm.v1.aes-sha2";
             rotation_period_ms?: number;
@@ -453,15 +473,15 @@ export class Session {
 
     /** @internal */
     async load(log: ILogItem) {
-        const txn = await this._storage.readTxn([
-            this._storage.storeNames.session,
-            this._storage.storeNames.roomSummary,
-            this._storage.storeNames.invites,
-            this._storage.storeNames.roomMembers,
-            this._storage.storeNames.timelineEvents,
-            this._storage.storeNames.timelineFragments,
-            this._storage.storeNames.pendingEvents,
-        ]);
+        let storeNames: string[] = [this._storage.storeNames.session];
+        // Gather all of the storeNames as given by all of the roomManagers
+        for (const roomTypeManager of this._roomManagers.values()) {
+            storeNames = [...storeNames, ...roomTypeManager.storesForLoad];
+        }
+        // dedup just in case
+        storeNames = [...new Set(storeNames)];
+
+        const txn = await this._storage.readTxn(storeNames);
         // restore session object
         this._syncInfo = await txn.session.get("sync");
         // restore e2ee account, if any
@@ -480,23 +500,15 @@ export class Session {
                 this._setupEncryption();
             }
         }
-        const pendingEventsByRoomId = await this._getPendingEventsByRoom(txn);
-        // load invites
-        const invites = await txn.invites.getAll();
-        const inviteLoadPromise = Promise.all(invites.map(async inviteData => {
-            const invite = this.createInvite(inviteData.roomId);
-            if (log) { log.wrap("invite", log => invite.load(inviteData, log)); } else { invite.load(inviteData, log) };
-            this._invites.add(invite.id, invite);
-        }));
-        // load rooms
-        const roomSummaries = await txn.roomSummary.getAll();
-        const roomLoadPromise = Promise.all(roomSummaries.map(async summary => {
-            const room = this.createJoinedRoom(summary.roomId!, pendingEventsByRoomId.get(summary.roomId!));
-            await log.wrap("room", log => room.load(summary, txn, log));
-            this._rooms?.add(room.id, room);
-        }));
-        // load invites and rooms in parallel
-        await Promise.all([inviteLoadPromise, roomLoadPromise]);
+
+        // Gather all of the load promises from all of the roomManagers
+        let loadPromises: Promise<void>[] = []
+        for (const roomTypeManager of this._roomManagers.values()) {
+            loadPromises = [...loadPromises, ...await roomTypeManager.createLoadPromises(txn, log)]
+        }
+
+        // load all room types in parallel
+        await Promise.all(loadPromises);
     }
 
     dispose() {
@@ -508,12 +520,7 @@ export class Session {
         this._megolmDecryption = undefined;
         this._e2eeAccount?.dispose();
         this._e2eeAccount = undefined;
-        if (this._rooms) {
-            for (const [_, room] of this._rooms) {
-                room.dispose();
-            }
-        }
-        this._rooms = undefined;
+        this._imRoomTypeManager.dispose();
     }
 
     /**
@@ -580,25 +587,12 @@ export class Session {
         }
     }
 
-    async _getPendingEventsByRoom(txn: Transaction): Promise<Map<string, [PendingEntry]>> {
-        const pendingEvents = await txn.pendingEvents.getAll();
-        return pendingEvents.reduce((groups, pe) => {
-            const group = groups.get(pe.roomId);
-            if (group) {
-                group.push(pe);
-            } else {
-                groups.set(pe.roomId, [pe]);
-            }
-            return groups;
-        }, new Map<string, [PendingEntry]>());
-    }
-
-    get rooms(): ObservableMap<string, Room> {
+    get rooms(): ObservableMap<string, InstantMessageRoom> {
         if (!this._rooms) throw new Error("session is missing rooms")
         return this._rooms;
     }
 
-    findDirectMessageForUserId(userId: string): Room | Invite | undefined {
+    findDirectMessageForUserId(userId: string): InstantMessageRoom | Invite | undefined {
         if (this._rooms) {
             for (const [_ ,room] of this._rooms) {
                 if (room.isDirectMessageForUserId(userId)) {
@@ -613,55 +607,8 @@ export class Session {
         }
     }
 
-    /** @internal */
-    createJoinedRoom(roomId: string, pendingEvents?: PendingEventData[]): Room {
-        return new Room({
-            roomId,
-            getSyncToken: this._getSyncToken,
-            storage: this._storage,
-            emitCollectionChange: this._roomUpdateCallback,
-            hsApi: this._hsApi,
-            mediaRepository: this._mediaRepository,
-            pendingEvents,
-            user: this._user,
-            createRoomEncryption: this._createRoomEncryption,
-            platform: this._platform
-        });
-    }
-
-    /** @internal */
-    _createArchivedRoom(roomId: string): ArchivedRoom {
-        const room = new ArchivedRoom({
-            roomId,
-            getSyncToken: this._getSyncToken,
-            storage: this._storage,
-            emitCollectionChange: () => {},
-            releaseCallback: () => this._activeArchivedRooms.delete(roomId),
-            forgetCallback: this._forgetArchivedRoom,
-            hsApi: this._hsApi,
-            mediaRepository: this._mediaRepository,
-            user: this._user,
-            createRoomEncryption: this._createRoomEncryption,
-            platform: this._platform
-        });
-        this._activeArchivedRooms.set(roomId, room);
-        return room;
-    }
-
     get invites(): ObservableMap<string, Invite> {
         return this._invites;
-    }
-
-    /** @internal */
-    createInvite(roomId: string): Invite {
-        return new Invite({
-            roomId,
-            hsApi: this._hsApi,
-            emitCollectionUpdate: this._inviteUpdateCallback,
-            mediaRepository: this._mediaRepository,
-            user: this._user,
-            platform: this._platform,
-        });
     }
 
     get roomsBeingCreated(): ObservableMap<string, RoomBeingCreated> {
@@ -792,59 +739,6 @@ export class Session {
         }
     }
 
-    applyRoomCollectionChangesAfterSync(inviteStates: InviteSyncProcessState[], roomStates: RoomSyncProcessState[], archivedRoomStates: ArchivedRoomSyncProcessState[], log: ILogItem) {
-        // update the collections after sync
-        for (const rs of roomStates) {
-            if (rs.shouldAdd) {
-                this._rooms?.add(rs.id, rs.room);
-                this._tryReplaceRoomBeingCreated(rs.id, log);
-            } else if (rs.shouldRemove) {
-                this._rooms?.remove(rs.id);
-            }
-        }
-        for (const is of inviteStates) {
-            if (is.shouldAdd) {
-                this._invites.add(is.id, is.invite);
-            } else if (is.shouldRemove) {
-                this._invites.remove(is.id);
-            }
-        }
-        // now all the collections are updated, update the room status
-        // so any listeners to the status will find the collections
-        // completely up to date
-        if (this._observedRoomStatus.size !== 0) {
-            for (const ars of archivedRoomStates) {
-                if (ars.shouldAdd) {
-                    this._observedRoomStatus.get(ars.id)?.set(RoomStatus.Archived);
-                }
-            }
-            for (const rs of roomStates) {
-                if (rs.shouldAdd) {
-                    this._observedRoomStatus.get(rs.id)?.set(RoomStatus.Joined);
-                }
-            }
-            for (const is of inviteStates) {
-                const statusObservable = this._observedRoomStatus.get(is.id);
-                if (statusObservable) {
-                    const withInvited = statusObservable.get() | RoomStatus.Invited;
-                    if (is.shouldAdd) {
-                        statusObservable.set(withInvited);
-                    } else if (is.shouldRemove) {
-                        const withoutInvited = withInvited ^ RoomStatus.Invited;
-                        statusObservable.set(withoutInvited);
-                    }
-                }
-            }
-        }
-    }
-
-    _forgetArchivedRoom(roomId: string) {
-        const statusObservable = this._observedRoomStatus.get(roomId);
-        if (statusObservable) {
-            statusObservable.set((statusObservable.get() | RoomStatus.Archived) ^ RoomStatus.Archived);
-        }
-    }
-
     /** @internal */
     get syncToken(): string | undefined {
         return this._syncInfo?.token;
@@ -861,6 +755,18 @@ export class Session {
 
     get mediaRepository(): MediaRepository {
         return this._mediaRepository;
+    }
+
+    get platform(): Platform {
+        return this._platform;
+    }
+
+    get storage(): Storage {
+        return this._storage;
+    }
+
+    get hsApi(): HomeServerApi {
+        return this._hsApi;
     }
 
     enablePushNotifications(enable: boolean) {
@@ -966,42 +872,8 @@ export class Session {
         return observable;
     }
 
-    /**
-    Creates an empty (summary isn't loaded) the archived room if it isn't
-    loaded already, assuming sync will either remove it (when rejoining) or
-    write a full summary adopting it from the joined room when leaving
-
-    @internal
-    */
-    createOrGetArchivedRoomForSync(roomId: string): ArchivedRoom {
-        let archivedRoom = this._activeArchivedRooms.get(roomId);
-        if (archivedRoom) {
-            archivedRoom.retain();
-        } else {
-            archivedRoom = this._createArchivedRoom(roomId);
-        }
-        return archivedRoom;
-    }
-
     loadArchivedRoom(roomId: string, log?: ILogItem): ArchivedRoom | undefined {
-        return this._platform.logger.wrapOrRun(log, "loadArchivedRoom", async log => {
-            log.set("id", roomId);
-            const activeArchivedRoom = this._activeArchivedRooms.get(roomId);
-            if (activeArchivedRoom) {
-                activeArchivedRoom.retain();
-                return activeArchivedRoom;
-            }
-            const txn = await this._storage.readTxn([
-                this._storage.storeNames.archivedRoomSummary,
-                this._storage.storeNames.roomMembers,
-            ]);
-            const summary = await txn.archivedRoomSummary.get(roomId);
-            if (summary) {
-                const room = this._createArchivedRoom(roomId);
-                await room.load(summary, txn, log);
-                return room;
-            }
-        });
+        return this._imRoomTypeManager.loadArchivedRoom(roomId, log)
     }
 
     joinRoom(roomIdOrAlias: string, log?: ILogItem): Promise<string> {

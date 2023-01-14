@@ -34,7 +34,7 @@ import type {EventKey} from "./timeline/EventKey";
 import type {MemberChange} from "./members/RoomMember";
 import type {HeroChanges} from "./members/Heroes";
 import { ILogItem } from "../../logging/types";
-import { JoinedRoom, LeftRoom } from "../net/types/sync";
+import { JoinedRoom, LeftRoom, Rooms, SyncResponse } from "../net/types/sync";
 import { Transaction } from "../storage/idb/Transaction";
 import { IncomingRoomKey } from "../e2ee/megolm/decryption/RoomKey";
 import { DecryptionChanges } from "../e2ee/megolm/decryption/DecryptionChanges";
@@ -46,7 +46,7 @@ type Options = {
     pendingEvents?: PendingEventData[];
 } & BaseRoomOptions;
 
-export class Room extends BaseRoom {
+export class InstantMessageRoom extends BaseRoom {
     private _syncWriter: SyncWriter;
     private _sendQueue: SendQueue;
 
@@ -76,7 +76,7 @@ export class Room extends BaseRoom {
         return false;
     }
 
-    async prepareSync(roomResponse: JoinedRoom | LeftRoom, membership: Membership | undefined, newKeys: IncomingRoomKey[], txn: Transaction, log: ILogItem): Promise<RoomSyncPreparation> {
+    async prepareSync(roomResponse: JoinedRoom | LeftRoom, membership: Membership | undefined, newKeys: IncomingRoomKey[], txn: Transaction, log: ILogItem): Promise<InstantMessageRoomPreparation> {
         log?.set("id", this.id);
         if (newKeys) {
             log?.set("newKeys", newKeys.length);
@@ -122,7 +122,7 @@ export class Room extends BaseRoom {
         };
     }
 
-    async afterPrepareSync(preparation: RoomSyncPreparation | undefined, parentLog: ILogItem) {
+    async afterPrepareSync(preparation: InstantMessageRoomPreparation | undefined, parentLog: ILogItem) {
         if (preparation?.decryptPreparation) {
             await parentLog.wrap("decrypt", async log => {
                 log.set("id", this.id);
@@ -136,17 +136,17 @@ export class Room extends BaseRoom {
      * @package
      */
      async writeSync(
-        roomResponse: LeftRoom,
-        isInitialSync: boolean,
         {
             summaryChanges,
             decryptChanges,
             roomEncryption,
             retryEntries,
-        }: RoomSyncPreparation,
+        }: InstantMessageRoomPreparation,
+        roomResponse: JoinedRoom | LeftRoom,
+        isInitialSync: boolean,
         txn: Transaction,
         log: ILogItem
-    ): Promise<RoomWriteSyncChanges> {
+    ): Promise<InstantMessageRoomWriteChanges> {
         log.set("id", this.id);
         const isRejoin = summaryChanges.isNewJoin(this._summary.data);
         if (isRejoin) {
@@ -233,7 +233,7 @@ export class Room extends BaseRoom {
      * Called with the changes returned from `writeSync` to apply them and emit changes.
      * No storage or network operations should be done here.
      */
-    afterSync(changes: RoomWriteSyncChanges, log: ILogItem) {
+    afterSync(changes: InstantMessageRoomWriteChanges, log: ILogItem) {
         const {
             summaryChanges, newEntries, updatedEntries, newLiveKey,
             removedPendingEvents, memberChanges, powerLevelsEvent,
@@ -332,7 +332,7 @@ export class Room extends BaseRoom {
      * Can be used to do longer running operations that resulted from the last sync,
      * like network operations.
      */
-    async afterSyncCompleted({encryptionChanges, decryption, newEntries, updatedEntries}: RoomWriteSyncChanges, log: ILogItem) {
+    async afterSyncCompleted({encryptionChanges, decryption, newEntries, updatedEntries}: InstantMessageRoomWriteChanges, log: ILogItem) {
         const shouldFlushKeys = encryptionChanges?.shouldFlush;
         const shouldFetchUnverifiedSenders = this._isTimelineOpen && decryption?.hasUnverifiedSenders;
         // only log rooms where we actually do something
@@ -519,7 +519,7 @@ export class Room extends BaseRoom {
 }
 
 
-export type RoomSyncPreparation = {
+export type InstantMessageRoomPreparation = {
     roomEncryption: RoomEncryption;
     summaryChanges: SummaryData;
     decryptPreparation: DecryptionPreparation;
@@ -532,7 +532,7 @@ export type RoomEncryptionWriteSyncChanges = {
     historyVisibility: HistoryVisibility;
 }
 
-export type RoomWriteSyncChanges = {
+export type InstantMessageRoomWriteChanges = {
     summaryChanges: SummaryData;
     roomEncryption: RoomEncryption;
     newEntries: EventEntry[];

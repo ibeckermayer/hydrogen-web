@@ -17,15 +17,15 @@ limitations under the License.
 import {ViewModel} from "../../ViewModel";
 import type {Options as BaseOptions} from "../../ViewModel";
 import type {SegmentType} from "../../navigation";
-import type {Room} from "../../../matrix/room/Room";
+import type {InstantMessageRoom} from "../../../matrix/room/InstantMessageRoom";
 import {avatarInitials, getIdentifierColorNumber, getAvatarHttpUrl} from "../../avatar";
 
-export type ExplicitOptions = { room: Room };
+export type ExplicitOptions = { room: InstantMessageRoom };
 
 type Options = ExplicitOptions & BaseOptions;
 
 export class RoomDetailsViewModel extends ViewModel {
-    private _room: Room
+    private _room: InstantMessageRoom
 
     constructor(options: Options) {
         super(options);

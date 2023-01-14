@@ -24,7 +24,7 @@ import { RoomFilter } from "./RoomFilter";
 import { ApplyMap, MappedMap, ObservableMap } from "../../../observable/";
 import { SortedMapList } from "../../../observable//list/SortedMapList";
 import { addPanelIfNeeded } from "../../navigation/index";
-import { Room } from "../../../matrix/room/Room";
+import { InstantMessageRoom } from "../../../matrix/room/InstantMessageRoom";
 import { Invite } from "../../../matrix/room/Invite";
 import { RoomBeingCreated } from "../../../matrix/room/RoomBeingCreated";
 import { Session } from "../../../matrix/Session";
@@ -40,7 +40,7 @@ export class LeftPanelViewModel extends ViewModel<
     private _currentTileVM?: BaseTileViewModel;
     private _tileViewModelsMap: MappedMap<
         string,
-        RoomBeingCreated | Invite | Room,
+        RoomBeingCreated | Invite | InstantMessageRoom,
         BaseTileViewModel
     >;
     private _tileViewModelsFilterMap: ApplyMap<string, BaseTileViewModel>;
@@ -71,12 +71,12 @@ export class LeftPanelViewModel extends ViewModel<
     _mapTileViewModels(
         roomsBeingCreated: ObservableMap<string, RoomBeingCreated>,
         invites: ObservableMap<string, Invite>,
-        rooms: ObservableMap<string, Room>
-    ): MappedMap<string, RoomBeingCreated | Invite | Room, BaseTileViewModel> {
+        rooms: ObservableMap<string, InstantMessageRoom>
+    ): MappedMap<string, RoomBeingCreated | Invite | InstantMessageRoom, BaseTileViewModel> {
         // join is not commutative, invites will take precedence over rooms
         const allTiles = invites
             .join(roomsBeingCreated, rooms)
-            .mapValues((item: RoomBeingCreated | Invite | Room, emitChange) => {
+            .mapValues((item: RoomBeingCreated | Invite | InstantMessageRoom, emitChange) => {
                 let vm: BaseTileViewModel;
                 if (item.isBeingCreated) {
                     vm = new RoomBeingCreatedTileViewModel(
@@ -94,7 +94,7 @@ export class LeftPanelViewModel extends ViewModel<
                     );
                 } else {
                     vm = new RoomTileViewModel(
-                        this.childOptions({ room: item as Room, emitChange })
+                        this.childOptions({ room: item as InstantMessageRoom, emitChange })
                     );
                 }
                 const isOpen =

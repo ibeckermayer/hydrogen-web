@@ -36,7 +36,7 @@ import {Membership, RoomEventType} from "../net/types/roomEvents";
 import type {Storage} from "../storage/idb/Storage";
 import type {HomeServerApi} from "../net/HomeServerApi";
 import type {MediaRepository} from "../net/MediaRepository";
-import type {Room} from "./Room";
+import type {InstantMessageRoom} from "./InstantMessageRoom";
 import type {RoomEncryption, SummaryData} from "../e2ee/RoomEncryption";
 import type {User} from "../User";
 import type {RoomMember} from "./members/RoomMember";
@@ -58,7 +58,7 @@ export type Options = {
     mediaRepository: MediaRepository;
     emitCollectionChange: (room: BaseRoom, params: any) => boolean | undefined;
     user: User;
-    createRoomEncryption: (room: Room, encryptionParams: EncryptionParams) => RoomEncryption | null;
+    createRoomEncryption: (room: InstantMessageRoom, encryptionParams: EncryptionParams) => RoomEncryption | null;
     getSyncToken: () => string | undefined;
     platform: Platform;
 }
